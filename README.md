@@ -42,3 +42,37 @@ You can install the dependencies using `requirements.txt` file.
 ```sh
 $ pip install -r requirements.txt
 ```
+
+### Usage
+
+In the following example you can see how to train a binary classifier of 2 hidden layers (50, 20 nodes) with `tanh` activation function on a dataset
+of `m` examples with 10-sized feature vector:
+
+```python
+from mynn import NeuralNetwork
+from mynn.activation import TanhActivation, SigmoidActivation
+
+
+nn = NeuralNetwork(
+    layers_config=[
+        (50, TanhActivation),
+        (20, TanhActivation),
+        (1, SigmoidActivation)
+    ],
+    n_x=10
+)
+
+# To train the vector we need to assure that input
+# vector is in (n, m) shape where n is the size of input
+# feature vector and m the number of samples
+X, Y = load_dataset()
+
+nn.train(X, Y)
+
+# To predict the class you can use the `predict()` method
+Y_pred = nn.predict(X_test)
+
+# If you need to take the prediction probability you can
+# just perform a forward propagation
+Y_proba = nn.forward(X_test)
+```
