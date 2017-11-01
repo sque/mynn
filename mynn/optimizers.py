@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Iterator
 import numpy as np
 
 from ._const import BIG_FLOAT
@@ -23,7 +23,7 @@ class OptimizerBase:
             return self.params[item]
         raise AttributeError()
 
-    def step(self, values: List[np.ndarray], grads: List[np.ndarray]) -> List[np.ndarray]:
+    def step(self, values: Iterator[np.ndarray], grads: Iterator[np.ndarray]) -> List[np.ndarray]:
         """
         Perform an optimization iteration to estimate better values
         :param values: The values to be optimize
@@ -62,7 +62,7 @@ class GradientDescent(OptimizerBase):
         """
         super().__init__(learning_rate=learning_rate, **extra_params)
 
-    def step(self, values: List[np.ndarray], grads: List[np.ndarray]) -> List[np.ndarray]:
+    def step(self, values: Iterator[np.ndarray], grads: Iterator[np.ndarray]) -> List[np.ndarray]:
         return [
             v - self.learning_rate * g
             for v, g in zip(values, grads)
@@ -86,7 +86,7 @@ class GradientDescentMomentum(GradientDescent):
         super().__init__(learning_rate=learning_rate, old_grad_percent=old_grad_percent)
         self._old_grads = None
 
-    def step(self, values: List[np.ndarray], grads: List[np.ndarray]) -> List[np.ndarray]:
+    def step(self, values: Iterator[np.ndarray], grads: Iterator[np.ndarray]) -> List[np.ndarray]:
         grads = list(grads)
         values = list(values)
         if self._old_grads is None:
@@ -126,7 +126,7 @@ class AdaptiveGradientDescentMomentum(GradientDescent):
         self._old_learning_rates = None
         self._old_grads = None
 
-    def step(self, values: List[np.ndarray], grads: List[np.ndarray]) -> List[np.ndarray]:
+    def step(self, values: Iterator[np.ndarray], grads: Iterator[np.ndarray]) -> List[np.ndarray]:
 
         grads = list(grads)
         values = list(values)
