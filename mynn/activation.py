@@ -1,7 +1,6 @@
-from typing import Union
 import numpy as np
 
-FloatOrArray = Union[np.ndarray, float]
+from ._const import FloatOrArray
 
 
 class BaseActivation:
@@ -11,9 +10,9 @@ class BaseActivation:
 
     def __call__(self, Z: FloatOrArray) -> FloatOrArray:
         """
-        Calculate the result of activation function on Z value
+        Calculate the direct result of function for Z value
         :param Z: An array of values to calculate the result
-        of the activation functions
+        of the functions
         :return: A number or an array of values in the same shape
         as Z.
         """
@@ -21,8 +20,7 @@ class BaseActivation:
 
     def derivative(self, A: FloatOrArray) -> FloatOrArray:
         """
-        Calculate the derivative of the activation function for the
-        value A
+        Calculate the derivative of the function for the value A
         :param A: The values to calculate derivatives
         :return: The derivative of the number or the array in the same
         shape as A
