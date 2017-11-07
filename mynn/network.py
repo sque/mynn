@@ -1,11 +1,16 @@
 from typing import List, Optional, Tuple
-from operator import itemgetter
+from collections import namedtuple
 
 import numpy as np
 
 from .optimizers import OptimizerBase, AdaptiveGradientDescentMomentum
 from .activation import BaseActivation, SigmoidActivation, TanhActivation
-from .loss import cross_entropy_loss, BaseLossFunction, CrossEntropyLoss
+from .loss import BaseLossFunction, CrossEntropyLoss
+
+
+LayerValues = namedtuple('LayerValues', ['A', 'Z'])
+LayerParameters = namedtuple('LayerParameters', ['W', 'b'])
+LayerGrads = namedtuple('LayerGrads', ['dW', 'db', 'dZ'])
 
 
 class NeuralNetwork:
@@ -48,18 +53,21 @@ class NeuralNetwork:
             self._layers_activation_func.append(activation_func())
 
         # Model parameters
-        self._layers_parameters: List[Tuple[np.ndarray, np.ndarray]] = None
+        self._layers_parameters: List[LayerParameters] = None
 
         # Model cache
-        self._layer_values = None
+        self._layer_values: List[LayerValues] = None
 
         self._initialize_network()
 
     def _initialize_network(self):
 
         # Initialize layer parameters
-        self._layers_parameters = [     # (W, b)
-            (np.random.randn(n, n_previous) * self._init_random_weight, np.zeros((n, 1)))
+        self._layers_parameters = [
+            LayerParameters(
+                W=np.random.randn(n, n_previous) * self._init_random_weight,
+                b=np.zeros((n, 1))
+            )
             for n, n_previous in zip(self._layers_size, [self._n_x] + self._layers_size)
         ]
 
@@ -76,9 +84,9 @@ class NeuralNetwork:
 
         A_previous = X
         self._layer_values: List[Tuple] = [(None, X)]  # (Z, A)
-        for (W, b), activation_func in zip(self._layers_parameters, self._layers_activation_func):
-            Z = np.dot(W, A_previous) + b       # Calculate linear output
-            A = activation_func(Z)              # Calculate activation function
+        for params, activation_func in zip(self._layers_parameters, self._layers_activation_func):
+            Z = np.dot(params.W, A_previous) + params.b         # Calculate linear output
+            A = activation_func(Z)                              # Calculate activation function
 
             # Save to layers cache
             self._layer_values.append((Z, A))
@@ -88,7 +96,7 @@ class NeuralNetwork:
 
         return A_previous
 
-    def backwards(self, Y: np.ndarray) -> np.ndarray:
+    def backwards(self, Y: np.ndarray) -> List[LayerGrads]:
         """
         Perform a backward propagation on the neural network
         :param Y: The expected outcome of the neural network
@@ -107,8 +115,8 @@ class NeuralNetwork:
         dW_last = np.dot(dZ_last, A_next.T) / m
         db_last = np.mean(dZ_last, axis=1, keepdims=True)
 
-        grads = [  # (dZ, dW, dB)
-            (dZ_last, dW_last, db_last)
+        grads = [
+            LayerGrads(dW=dW_last, db=db_last, dZ=dZ_last)
         ]
         dZ_previous = dZ_last
 
@@ -125,11 +133,11 @@ class NeuralNetwork:
             dZ = np.dot(W_previous.T, dZ_previous) * act_func.derivative(A)
             dW = np.dot(dZ, A_next.T) / m
             db = np.mean(dZ, axis=1, keepdims=True)
-            grads.append((dZ, dW, db))
+            grads.append(LayerGrads(dW=dW, db=db, dZ=dZ))
 
             dZ_previous = dZ
 
-        return np.array(list(reversed(grads)))
+        return list(reversed(grads))
 
     def loss(self, A:np.ndarray, Y:np.ndarray) -> np.ndarray:
         """
@@ -163,8 +171,8 @@ class NeuralNetwork:
 
             params_and_grads = list(chain.from_iterable([
                 (
-                    (layer_curr_params[0], layer_grads[1]),
-                    (layer_curr_params[1], layer_grads[2])
+                    (layer_curr_params.W, layer_grads.dW),
+                    (layer_curr_params.b, layer_grads.db)
                 )
                 for layer_curr_params, layer_grads in zip(self._layers_parameters, grads)
             ]))
@@ -174,7 +182,7 @@ class NeuralNetwork:
                 map(lambda pg: pg[1], params_and_grads))
 
             self._layers_parameters = [
-                (new_params_flatten[i], new_params_flatten[i + 1])
+                LayerParameters(W=new_params_flatten[i], b=new_params_flatten[i + 1])
                 for i in range(0, len(new_params_flatten), 2)
             ]
 
