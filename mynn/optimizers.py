@@ -1,7 +1,11 @@
+import logging as _logging
 from typing import List, Optional, Iterator
 import numpy as np
 
 from ._const import BIG_FLOAT
+
+
+logger = _logging.getLogger(__name__)
 
 
 class OptimizerBase:
@@ -131,7 +135,7 @@ class AdaptiveGradientDescentMomentum(GradientDescent):
         grads = list(grads)
         values = list(values)
         if self._old_learning_rates is None:
-            print("old learning rates")
+            logger.debug("AGDM: First iteration... fall back on classic GradientDescent")
             self._old_learning_rates = [np.ones(lr.shape) * self.max_learning_rate for lr in values]
             self._old_grads = grads
             return super().step(values, grads)
