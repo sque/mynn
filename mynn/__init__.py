@@ -1,6 +1,5 @@
-from .network import NeuralNetwork
+from .network import FNN
 
-
-__all__ =[
-    "NeuralNetwork"
+__all__ = [
+    "FNN"
 ]

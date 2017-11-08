@@ -1,31 +1,38 @@
+import logging as _logging
 from typing import List, Optional, Tuple
 from collections import namedtuple
 
 import numpy as np
 
 from .optimizers import OptimizerBase, AdaptiveGradientDescentMomentum
-from .activation import BaseActivation, SigmoidActivation, TanhActivation
+from .activation import BaseActivation
 from .loss import BaseLossFunction, CrossEntropyLoss
+from . import _utils
 
 
-LayerValues = namedtuple('LayerValues', ['A', 'Z'])
+logger = _logging.getLogger(__name__)
+
+LayerValues = namedtuple('LayerValues', ['Z', 'A'])
 LayerParameters = namedtuple('LayerParameters', ['W', 'b'])
 LayerGrads = namedtuple('LayerGrads', ['dW', 'db', 'dZ'])
 
 
-class NeuralNetwork:
+class FNN:
     """
-    L-NeuralNetwork with sigmoid output and cross-entropy loss function
+    Simple implementation of L Feedforward Neural Network
     """
 
     def __init__(self, layers_config: List[Tuple[int, BaseActivation]],
                  n_x: int,
-                 init_random_weight=0.001,
+                 init_random_weight=0.01,
                  prediction_proba_threshold: int = 0.5,
                  optimizer: Optional[OptimizerBase] = None,
-                 cost_function: Optional[BaseLossFunction] = None):
+                 loss_function: Optional[BaseLossFunction] = None,
+                 verbose_logging: bool = False):
         """
-        Initiate an untrained neural network
+        Initiate an untrained FNN. Notation and index of layers is according to Andrew's NG
+        lesson for Neural Networks. So layer 1 is the input layer and layer 0 is a pseudo-layer
+        for input data.
         :param layers_config: A list of tuples describing each layer starting from the first hidden till the output
         layer. The tuple must consist of the number of nodes and the class of the activation function to use.
         :param n_x: Number of input features
@@ -33,7 +40,10 @@ class NeuralNetwork:
         :param prediction_proba_threshold: The probability threshold to select one class or another.
         :param optimizer: The optimizer object to use for optimization. If not defined it will use the Adaptive GD
         with default parameters.
-        :param cost_function:
+        :param loss_function: The loss function to use for training the neural network. If not set the default
+        CrossEntropyLoss will be used.
+        :param verbose_logging: A flag, where if True it will enable logging extract debug information under DEBUG
+        level. This is disabled by default for performance reasons.
         """
 
         # Hyper parameters
@@ -44,35 +54,46 @@ class NeuralNetwork:
         self._init_random_weight = init_random_weight
         self._prediction_proba_threshold = prediction_proba_threshold
         self._optimizer: OptimizerBase = optimizer or AdaptiveGradientDescentMomentum()
-        self._cost_function: BaseLossFunction = cost_function or CrossEntropyLoss()
+        self._loss_function: BaseLossFunction = loss_function or CrossEntropyLoss()
 
         # Parse layer configuration
+        self._layers_size.append(n_x)
+        self._layers_activation_func.append(None)
+        self._layers_parameters = [LayerParameters(W=1, b=2)]
         for layer_size, activation_func in layers_config:
             assert (issubclass(activation_func, BaseActivation))
             self._layers_size.append(layer_size)
             self._layers_activation_func.append(activation_func())
 
         # Model parameters
-        self._layers_parameters: List[LayerParameters] = None
+        self._layers_parameters: List[LayerParameters] = []
 
         # Model cache
         self._layer_values: List[LayerValues] = None
 
         self._initialize_network()
 
+        self._verbose_logging = verbose_logging
+        logger.debug(f"Initialized FNN network of #{len(self._layers_size) - 1} layers")
+        logger.debug(f"  Layers sizes: {self._layers_size[1:]}")
+        logger.debug(f"  Activation functions: {self._layers_activation_func[1:]}")
+
     def _initialize_network(self):
 
         # Initialize layer parameters
-        self._layers_parameters = [
+        self._layers_parameters = [LayerParameters(None, None)] + [
             LayerParameters(
-                W=np.random.randn(n, n_previous) * self._init_random_weight,
+                W=np.random.randn(n, n_left) / np.sqrt(n_left),
                 b=np.zeros((n, 1))
             )
-            for n, n_previous in zip(self._layers_size, [self._n_x] + self._layers_size)
+            for n, n_left in zip(self._layers_size[1:], self._layers_size)
         ]
 
     @property
     def optimizer(self) -> OptimizerBase:
+        """
+        Get access to optimizer object
+        """
         return self._optimizer
 
     def forward(self, X: np.ndarray) -> np.ndarray:
@@ -82,18 +103,22 @@ class NeuralNetwork:
         :return: The response value of the model (Y)
         """
 
+        if self._verbose_logging:
+            logger.debug(f"Performing forward propagation for X:{X.shape}")
+
         A_previous = X
-        self._layer_values: List[Tuple] = [(None, X)]  # (Z, A)
-        for params, activation_func in zip(self._layers_parameters, self._layers_activation_func):
+        self._layer_values: List[Tuple] = [LayerValues(Z=None, A=X)]  # (Z, A)
+        for params, activation_func in zip(self._layers_parameters[1:], self._layers_activation_func[1:]):
             Z = np.dot(params.W, A_previous) + params.b         # Calculate linear output
             A = activation_func(Z)                              # Calculate activation function
 
             # Save to layers cache
-            self._layer_values.append((Z, A))
+            self._layer_values.append(LayerValues(Z=Z, A=A))
 
             # Change previous A and continue
             A_previous = A
 
+        # print(f"Size of layer values: {len(self._layer_values)}")
         return A_previous
 
     def backwards(self, Y: np.ndarray) -> List[LayerGrads]:
@@ -103,50 +128,41 @@ class NeuralNetwork:
         :return: The gradients of all parameters starting from the left till the right most layer.
         """
 
-        reversed_layer_values = list(reversed(self._layer_values))
-        reversed_layer_params = list(reversed(self._layers_parameters))
-        reversed_activation_functions = list(reversed(self._layers_activation_func))
-        m = Y.shape[1]  # number of samples
+        if self._verbose_logging:
+            logger.debug(f"Performing backwards propagation for Y:{Y.shape}")
 
-        # Special case for last layer (first in back-propagation)
-        _, A_last = reversed_layer_values[0]
-        dZ_last = A_last - Y
-        A_next = reversed_layer_values[1][1]
-        dW_last = np.dot(dZ_last, A_next.T) / m
-        db_last = np.mean(dZ_last, axis=1, keepdims=True)
+        m = Y.shape[1]      # number of samples
+        dA_l_right = None
 
-        grads = [
-            LayerGrads(dW=dW_last, db=db_last, dZ=dZ_last)
-        ]
-        dZ_previous = dZ_last
-
-        for act_func, lvalues, lvalues_prev, lparams_prev in zip(
-                reversed_activation_functions[1:],
-                reversed_layer_values[1:],
-                reversed_layer_values[2:],
-                reversed_layer_params[0:]
+        grads = []
+        for l_activation_func, l_params, l_values, l_left_values in zip(
+                reversed(self._layers_activation_func),
+                reversed(self._layers_parameters),
+                reversed(self._layer_values),
+                reversed(self._layer_values[:-1]),
         ):
-            Z, A = lvalues
-            _, A_next = lvalues_prev
-            W_previous, b_previous = lparams_prev
+            if dA_l_right is None:
+                dA_l_right = self._loss_function.derivative(A=l_values.A, Y=Y)
 
-            dZ = np.dot(W_previous.T, dZ_previous) * act_func.derivative(A)
-            dW = np.dot(dZ, A_next.T) / m
+            # Calculate dZ, dW, db for this layer and store them
+            dZ = dA_l_right * l_activation_func.derivative(l_values.Z)
+            dW = np.dot(dZ, l_left_values.A.T) / m
             db = np.mean(dZ, axis=1, keepdims=True)
             grads.append(LayerGrads(dW=dW, db=db, dZ=dZ))
 
-            dZ_previous = dZ
+            # Calculate the current dA so that it will be used in next iteration
+            dA_l_right = np.dot(l_params.W.T, dZ)
 
         return list(reversed(grads))
 
-    def loss(self, A:np.ndarray, Y:np.ndarray) -> np.ndarray:
+    def loss(self, A: np.ndarray, Y: np.ndarray) -> np.ndarray:
         """
         Calculate the loss between two vectors
         :param A: The response of the model
         :param Y: The expected output
         :return: A scalar value per sample of the loss
         """
-        return self._cost_function(A, Y)
+        return self._loss_function(A, Y)
 
     def train(self, X: np.ndarray, Y: np.ndarray, iterations: int = 100) -> np.ndarray:
         """
@@ -158,37 +174,43 @@ class NeuralNetwork:
         :param iterations: The number of iterations to optimize parameters of the network
         :return: The final cost per iteration
         """
-        from itertools import chain
 
         costs = []
         for iter_count in range(iterations):
-            self.forward(X)
+            if self._verbose_logging:
+                logger.debug(f"Starting train iteration: {iter_count} ")
 
+            # Forward and then backwards propagation to generate the gradients
+            self.forward(X)
             grads = self.backwards(Y)
 
-            cost = self.loss(self._layer_values[-1][1], Y)
+            # Calculate loss and give a chance to the optimizer to do something smarter
+            cost = self.loss(self._layer_values[-1].A, Y)
             self._optimizer.update_loss(cost)
 
-            params_and_grads = list(chain.from_iterable([
-                (
-                    (layer_curr_params.W, layer_grads.dW),
-                    (layer_curr_params.b, layer_grads.db)
-                )
-                for layer_curr_params, layer_grads in zip(self._layers_parameters, grads)
-            ]))
+            # Parameters and grads are stored in named tuples per layer. Optimizer does not
+            # understand this structure but expects an iterable for values and for grads. In
+            # the next two blocks we unpack parameters in a flat format to optimize them and
+            # then repack to store them.
 
+            # Unpack parameters and grads and trigger optimizer step
             new_params_flatten = self._optimizer.step(
-                map(lambda pg: pg[0], params_and_grads),
-                map(lambda pg: pg[1], params_and_grads))
+                _utils.nested_chain_iterable(self._layers_parameters[1:], 2),
+                _utils.nested_chain_iterable(grads, 2)
+            )
 
-            self._layers_parameters = [
-                LayerParameters(W=new_params_flatten[i], b=new_params_flatten[i + 1])
-                for i in range(0, len(new_params_flatten), 2)
-            ]
+            # Repack and update model parameters
+            for l, parameters in enumerate(_utils.grouped(new_params_flatten, 2), 1):
+                self._layers_parameters[l] = LayerParameters(
+                    W=parameters[0], b=parameters[1]
+                )
 
             costs.append(cost)
-            if iter_count % 1000 == 0:
-                print(f"Iteration: {iter_count}, Cost: {self._optimizer.best_loss}")
+            if self._verbose_logging or iter_count % 100 == 0:
+                logger.debug(f"Iteration: {iter_count}, Cost: {cost}")
+
+        logger.debug(f"Finished training after {iter_count + 1} iterations with final cost: {cost}")
+
         return np.array(costs)
 
     def predict(self, X: np.ndarray) -> np.ndarray:
