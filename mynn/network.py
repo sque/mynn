@@ -14,7 +14,7 @@ logger = _logging.getLogger(__name__)
 
 LayerValues = namedtuple('LayerValues', ['Z', 'A'])
 LayerParameters = namedtuple('LayerParameters', ['W', 'b'])
-LayerGrads = namedtuple('LayerGrads', ['dW', 'db', 'dZ'])
+LayerGrads = namedtuple('LayerGrads', ['dW', 'db'])
 
 
 class FNN:
@@ -118,7 +118,6 @@ class FNN:
             # Change previous A and continue
             A_previous = A
 
-        # print(f"Size of layer values: {len(self._layer_values)}")
         return A_previous
 
     def backwards(self, Y: np.ndarray) -> List[LayerGrads]:
@@ -148,7 +147,7 @@ class FNN:
             dZ = dA_l_right * l_activation_func.derivative(l_values.Z)
             dW = np.dot(dZ, l_left_values.A.T) / m
             db = np.mean(dZ, axis=1, keepdims=True)
-            grads.append(LayerGrads(dW=dW, db=db, dZ=dZ))
+            grads.append(LayerGrads(dW=dW, db=db))
 
             # Calculate the current dA so that it will be used in next iteration
             dA_l_right = np.dot(l_params.W.T, dZ)
@@ -195,8 +194,8 @@ class FNN:
 
             # Unpack parameters and grads and trigger optimizer step
             new_params_flatten = self._optimizer.step(
-                _utils.nested_chain_iterable(self._layers_parameters[1:], 2),
-                _utils.nested_chain_iterable(grads, 2)
+                list(_utils.nested_chain_iterable(self._layers_parameters[1:], 1)),
+                list(_utils.nested_chain_iterable(grads, 1))
             )
 
             # Repack and update model parameters

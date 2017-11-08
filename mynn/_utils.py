@@ -31,7 +31,6 @@ def nested_chain_iterable(s: Iterable, levels: int) -> Tuple:
 
     iterator = chain.from_iterable(s)
     for i in range(levels-1):
-        print(i)
         iterator = chain.from_iterable(iterator)
 
     return iterator
