@@ -17,7 +17,7 @@ class BaseLossFunction:
         """
         raise NotImplementedError()
 
-    def derivative(self, A: FloatOrArray) -> FloatOrArray:
+    def derivative(self, A: FloatOrArray, Y: FloatOrArray) -> FloatOrArray:
         """
         Calculate the derivative of the function for the value A
         :param A: The values to calculate derivatives
@@ -29,6 +29,15 @@ class BaseLossFunction:
 
 class CrossEntropyLoss:
 
+    @staticmethod
+    def _clip_activations(A: FloatOrArray) -> FloatOrArray:
+        """
+        Clip activation values to be in open range of (0, 1)
+        :param A: The outcome of the activation function
+        :return: Clipped values with a very small amount
+        """
+        return np.clip(A, SMALL_FLOAT, 1 - SMALL_FLOAT)
+
     def __call__(self, A: FloatOrArray, Y: FloatOrArray) -> FloatOrArray:
         """
         Given two vectors calculate the loss function
@@ -36,7 +45,7 @@ class CrossEntropyLoss:
         :param Y: The expected output of the neural network
         :return: The loss of the network
         """
-        A = np.where(A == 0, SMALL_FLOAT, A)  # Replace all zero with a very small number
+        A = self._clip_activations(A)
         logprobs = np.multiply(np.log(A), Y) + np.multiply((1 - Y), np.log((1 - A)))
         return np.squeeze(- np.mean(logprobs))
 
@@ -47,4 +56,5 @@ class CrossEntropyLoss:
         :return: The derivative of the number or the array in the same
         shape as A
         """
+        A = self._clip_activations(A)
         return - (np.divide(Y, A) - np.divide(1 - Y, 1 - A))
