@@ -36,8 +36,8 @@ class SigmoidActivation(BaseActivation):
     def __call__(self, Z: FloatOrArray) -> FloatOrArray:
         return 1 / (1 + np.exp(-Z))
 
-    def derivative(self, A: FloatOrArray) -> FloatOrArray:
-        return self(A) * (1 - self(A))
+    def derivative(self, Z: FloatOrArray) -> FloatOrArray:
+        return self(Z) * (1 - self(Z))
 
 
 class TanhActivation(BaseActivation):
@@ -48,8 +48,8 @@ class TanhActivation(BaseActivation):
     def __call__(self, Z: FloatOrArray) -> FloatOrArray:
         return np.tanh(Z)
 
-    def derivative(self, A: FloatOrArray) -> FloatOrArray:
-        return 1 - A ** 2
+    def derivative(self, Z: FloatOrArray) -> FloatOrArray:
+        return 1 - np.tanh(Z) ** 2
 
 
 class ReLUActivation(BaseActivation):
@@ -60,5 +60,8 @@ class ReLUActivation(BaseActivation):
     def __call__(self, Z: FloatOrArray) -> FloatOrArray:
         return np.maximum(0, Z)
 
-    def derivative(self, A: FloatOrArray) -> FloatOrArray:
-        return np.array(A > 0, dtype='float')
+    def derivative(self, Z: FloatOrArray) -> FloatOrArray:
+        if isinstance(Z, (float, np.float)):
+            return int(Z > 0)
+        else:
+            return np.array(Z > 0, dtype='float')
