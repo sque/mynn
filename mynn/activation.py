@@ -27,6 +27,12 @@ class BaseActivation:
         """
         raise NotImplementedError()
 
+    def __repr__(self) -> str:
+        """
+        Just return the name of the final class
+        """
+        return self.__class__.__name__.split('.')[-1]
+
 
 class SigmoidActivation(BaseActivation):
     """
