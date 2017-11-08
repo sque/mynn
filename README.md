@@ -7,7 +7,10 @@ A useful tool if you are interested to discover the intuition of neural networks
 
 ### Usage
 
-In the following example you can see how to train a binary classifier of 2 hidden layers (50, 20 nodes) with `tanh` 
+For quick demo you can see the notebook with a detailed example on how to train and use a NN:
+ * [Feedforward NN on binary classification problem](Docs/FNN on binary classification of a flower.ipynb)
+
+Or you can see the following snippet on how to train a binary classifier of 2 hidden layers (50, 20 nodes) with `tanh` 
 activation function for the hidden layers and `sigmoid` for the output on a dataset
 of `m` examples with 10-sized feature vector:
 
