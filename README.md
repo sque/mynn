@@ -66,6 +66,13 @@ into account the previous grads in order to keep a momentum
 * `AdaptiveGradientDescent` (**Default**): A gradient descent that adapts learning rate per
 optimized parameter. 
 
+### Weight Initialization
+The library supports different ways to initialize the weights of the linear functions. By
+default it ships with the following strategies:
+* `ConstantWeightInitializer` : It will initialize weight from a predefined list of constant values.
+* `NormalWeightInitializer` : It will initialize weights with random values following a normal distribution.
+* `VarianceScalingWeightInitializer` : (Default with scale=2) It will initialize weights with random values following a 
+normal distribution scaled to ensure a specific variance per layer.
 
 ### Installation
 MyNN can **only** work on `python >= 3.6`. It is proposed to use `virtualenv` to perform
