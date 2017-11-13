@@ -62,7 +62,7 @@ class NormalWeightInitializerTestCase(unittest.TestCase):
                                [1.46210794, -2.06014071, -0.3224172, -0.38405435, 1.13376944],
                                [-1.09989127, -0.17242821, -0.87785842, 0.04221375, 0.58281521]])
 
-        self.assertTrue(np.allclose(W, expected_w))
+        self.assertTrue(np.allclose(W, random_normal))
 
         self.assertTrue(np.all(
             b == np.zeros((4, 1))
