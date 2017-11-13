@@ -6,6 +6,7 @@ import numpy as np
 
 from .optimizers import OptimizerBase, AdaptiveGradientDescentMomentum
 from .activation import BaseActivation
+from .initializers import WeightInitializerBase, VarianceScalingWeightInitializer
 from .loss import BaseLossFunction, CrossEntropyLoss
 from . import _utils
 
@@ -28,7 +29,8 @@ class FNN:
                  prediction_proba_threshold: int = 0.5,
                  optimizer: Optional[OptimizerBase] = None,
                  loss_function: Optional[BaseLossFunction] = None,
-                 verbose_logging: bool = False):
+                 verbose_logging: bool = False,
+                 initializer: Optional[WeightInitializerBase] = False):
         """
         Initiate an untrained FNN. Notation and index of layers is according to Andrew's NG
         lesson for Neural Networks. So layer 1 is the input layer and layer 0 is a pseudo-layer
@@ -36,7 +38,6 @@ class FNN:
         :param layers_config: A list of tuples describing each layer starting from the first hidden till the output
         layer. The tuple must consist of the number of nodes and the class of the activation function to use.
         :param n_x: Number of input features
-        :param init_random_weight: Weight of the random factor to initialize model parameters
         :param prediction_proba_threshold: The probability threshold to select one class or another.
         :param optimizer: The optimizer object to use for optimization. If not defined it will use the Adaptive GD
         with default parameters.
@@ -44,6 +45,8 @@ class FNN:
         CrossEntropyLoss will be used.
         :param verbose_logging: A flag, where if True it will enable logging extract debug information under DEBUG
         level. This is disabled by default for performance reasons.
+        :param initializer: The weight initializer algorithm. If None the default VarianceScaling of scale=2 will be
+        used.
         """
 
         # Hyper parameters
@@ -51,9 +54,9 @@ class FNN:
         self._n_x: int = n_x
         self._layers_activation_func: List[BaseActivation] = []
         self._cached_activations = []
-        self._init_random_weight = init_random_weight
         self._prediction_proba_threshold = prediction_proba_threshold
         self._optimizer: OptimizerBase = optimizer or AdaptiveGradientDescentMomentum()
+        self._initializer: WeightInitializerBase = initializer or VarianceScalingWeightInitializer(scale=2)
         self._loss_function: BaseLossFunction = loss_function or CrossEntropyLoss()
 
         # Parse layer configuration
@@ -81,13 +84,10 @@ class FNN:
     def _initialize_network(self):
 
         # Initialize layer parameters
-        self._layers_parameters = [LayerParameters(None, None)] + [
-            LayerParameters(
-                W=np.random.randn(n, n_left) / np.sqrt(n_left),
-                b=np.zeros((n, 1))
-            )
-            for n, n_left in zip(self._layers_size[1:], self._layers_size)
-        ]
+        self._layers_parameters = [LayerParameters(None, None)]
+        for l, (n, n_left) in enumerate(zip(self._layers_size[1:], self._layers_size), start=1):
+            W, b = self._initializer.get_initial_weight(l=l, n=n, n_left=n_left)
+            self._layers_parameters.append(LayerParameters(W=W, b=b))
 
     @property
     def optimizer(self) -> OptimizerBase:
