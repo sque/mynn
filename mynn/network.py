@@ -29,7 +29,8 @@ class FNN:
                  optimizer: Optional[OptimizerBase] = None,
                  loss_function: Optional[BaseLossFunction] = None,
                  verbose_logging: bool = False,
-                 initializer: Optional[WeightInitializerBase] = False):
+                 initializer: Optional[WeightInitializerBase] = False,
+                 l2_regularization_lambda: Optional[float] = None):
         """
         Initiate an untrained FNN. Notation and index of layers is according to Andrew's NG
         lesson for Neural Networks. So layer 1 is the input layer and layer 0 is a pseudo-layer
@@ -45,6 +46,7 @@ class FNN:
         :param verbose_logging: A flag, where if True it will enable logging extract debug information under DEBUG
         level. This is disabled by default for performance reasons.
         :param initializer: The weight initializer algorithm. If None the default VarianceScaling of scale=2 will be
+        :param l2_regularization_lambda: The λ of the L2 regularization. If None L2 regularization will be disabled.
         used.
         """
 
@@ -57,6 +59,7 @@ class FNN:
         self._optimizer: OptimizerBase = optimizer or AdaptiveGradientDescentMomentum()
         self._initializer: WeightInitializerBase = initializer or VarianceScalingWeightInitializer(scale=2)
         self._loss_function: BaseLossFunction = loss_function or CrossEntropyLoss()
+        self._l2_regularization_lambda = l2_regularization_lambda
 
         # Parse layer configuration
         self._layers_size.append(n_x)
@@ -131,6 +134,7 @@ class FNN:
 
         m = Y.shape[1]      # number of samples
         dA_l_right = None
+        l2_regularization_term = 0.0
 
         grads = []
         for l_activation_func, l_params, l_values, l_left_values in zip(
@@ -140,11 +144,16 @@ class FNN:
                 reversed(self._layer_values[:-1]),
         ):
             if dA_l_right is None:
+                # First iteration, take dA from loss function
                 dA_l_right = self._loss_function.derivative(A=l_values.A, Y=Y)
+
+            # Calculate L2 regularization term reverse term
+            if self._l2_regularization_lambda is not None:
+                l2_regularization_term = self._l2_regularization_lambda * l_params.W / (2 * m)
 
             # Calculate dZ, dW, db for this layer and store them
             dZ = dA_l_right * l_activation_func.derivative(l_values.Z)
-            dW = np.dot(dZ, l_left_values.A.T) / m
+            dW = np.dot(dZ, l_left_values.A.T) / m + l2_regularization_term
             db = np.mean(dZ, axis=1, keepdims=True)
             grads.append(LayerGrads(dW=dW, db=db))
 
