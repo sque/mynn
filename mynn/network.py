@@ -25,7 +25,6 @@ class FNN:
 
     def __init__(self, layers_config: List[Tuple[int, BaseActivation]],
                  n_x: int,
-                 init_random_weight=0.01,
                  prediction_proba_threshold: int = 0.5,
                  optimizer: Optional[OptimizerBase] = None,
                  loss_function: Optional[BaseLossFunction] = None,
