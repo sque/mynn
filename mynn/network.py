@@ -1,6 +1,5 @@
 import logging as _logging
 from typing import List, Optional, Tuple
-from collections import namedtuple
 
 import numpy as np
 
@@ -9,13 +8,12 @@ from .activation import BaseActivation
 from .initializers import WeightInitializerBase, VarianceScalingWeightInitializer
 from .loss import BaseLossFunction, CrossEntropyLoss
 from . import _utils
+from .value_types import LayerParameters, LayerValues, LayerGrads
+from .regularization import RegularizationBase
 
 
 logger = _logging.getLogger(__name__)
 
-LayerValues = namedtuple('LayerValues', ['Z', 'A'])
-LayerParameters = namedtuple('LayerParameters', ['W', 'b'])
-LayerGrads = namedtuple('LayerGrads', ['dW', 'db'])
 
 
 class FNN:
@@ -30,7 +28,7 @@ class FNN:
                  loss_function: Optional[BaseLossFunction] = None,
                  verbose_logging: bool = False,
                  initializer: Optional[WeightInitializerBase] = False,
-                 l2_regularization_lambda: Optional[float] = None):
+                 regularization: Optional[RegularizationBase] = None):
         """
         Initiate an untrained FNN. Notation and index of layers is according to Andrew's NG
         lesson for Neural Networks. So layer 1 is the input layer and layer 0 is a pseudo-layer
@@ -46,7 +44,7 @@ class FNN:
         :param verbose_logging: A flag, where if True it will enable logging extract debug information under DEBUG
         level. This is disabled by default for performance reasons.
         :param initializer: The weight initializer algorithm. If None the default VarianceScaling of scale=2 will be
-        :param l2_regularization_lambda: The λ of the L2 regularization. If None L2 regularization will be disabled.
+        :param regularization: A regularization method to be applied on the model.
         used.
         """
 
@@ -59,7 +57,7 @@ class FNN:
         self._optimizer: OptimizerBase = optimizer or AdaptiveGradientDescentMomentum()
         self._initializer: WeightInitializerBase = initializer or VarianceScalingWeightInitializer(scale=2)
         self._loss_function: BaseLossFunction = loss_function or CrossEntropyLoss()
-        self._l2_regularization_lambda = l2_regularization_lambda
+        self._regularization = regularization
 
         # Parse layer configuration
         self._layers_size.append(n_x)
@@ -82,6 +80,7 @@ class FNN:
         logger.debug(f"Initialized FNN network of #{len(self._layers_size) - 1} layers")
         logger.debug(f"  Layers sizes: {self._layers_size[1:]}")
         logger.debug(f"  Activation functions: {self._layers_activation_func[1:]}")
+        logger.debug(f"  Regularization: {self._regularization}")
 
     def _initialize_network(self):
 
@@ -109,13 +108,27 @@ class FNN:
             logger.debug(f"Performing forward propagation for X:{X.shape}")
 
         A_previous = X
-        self._layer_values: List[Tuple] = [LayerValues(Z=None, A=X)]  # (Z, A)
-        for params, activation_func in zip(self._layers_parameters[1:], self._layers_activation_func[1:]):
-            Z = np.dot(params.W, A_previous) + params.b         # Calculate linear output
-            A = activation_func(Z)                              # Calculate activation function
+        self._layer_values: List[Tuple] = [LayerValues(Z=None, A=X, extras={})]  # (Z, A)
+        for l_index, l_params, l_activation_func in zip(
+                range(1, len(self._layers_parameters) + 1),
+                self._layers_parameters[1:],
+                self._layers_activation_func[1:]):
+
+            Z = np.dot(l_params.W, A_previous) + l_params.b         # Calculate linear output
+            A = l_activation_func(Z)                              # Calculate activation function
+
+            layer_values = LayerValues(Z=Z, A=A, extras={})
+
+            # Regularization hook
+            if self._regularization:
+                layer_values = self._regularization.on_post_forward_propagation(
+                    layer_values=layer_values,
+                    layer_index=l_index,
+                    layer_params=l_params,
+                )
 
             # Save to layers cache
-            self._layer_values.append(LayerValues(Z=Z, A=A))
+            self._layer_values.append(layer_values)
 
             # Change previous A and continue
             A_previous = A
@@ -134,10 +147,10 @@ class FNN:
 
         m = Y.shape[1]      # number of samples
         dA_l_right = None
-        l2_regularization_term = 0.0
 
         grads = []
-        for l_activation_func, l_params, l_values, l_left_values in zip(
+        for l_index, l_activation_func, l_params, l_values, l_left_values in zip(
+                range(len(self._layer_values) - 1, 0, -1),
                 reversed(self._layers_activation_func),
                 reversed(self._layers_parameters),
                 reversed(self._layer_values),
@@ -147,15 +160,32 @@ class FNN:
                 # First iteration, take dA from loss function
                 dA_l_right = self._loss_function.derivative(A=l_values.A, Y=Y)
 
-            # Calculate L2 regularization term reverse term
-            if self._l2_regularization_lambda is not None:
-                l2_regularization_term = self._l2_regularization_lambda * l_params.W / (2 * m)
+            # Regularization hook
+            if self._regularization:
+                dA_l_right = self._regularization.on_pre_backward_propagation(
+                    dA=dA_l_right,
+                    layer_index=l_index,
+                    samples=m,
+                    layer_values=l_values,
+                    layer_params=l_params)
 
             # Calculate dZ, dW, db for this layer and store them
             dZ = dA_l_right * l_activation_func.derivative(l_values.Z)
-            dW = np.dot(dZ, l_left_values.A.T) / m + l2_regularization_term
+            dW = np.dot(dZ, l_left_values.A.T) / m
             db = np.mean(dZ, axis=1, keepdims=True)
-            grads.append(LayerGrads(dW=dW, db=db))
+
+            layer_grads = LayerGrads(dW=dW, db=db)
+
+            # Regularization hook
+            if self._regularization:
+                layer_grads = self._regularization.on_post_backward_propagation(
+                    grads=layer_grads,
+                    layer_index=l_index,
+                    samples=m,
+                    layer_values=l_values,
+                    layer_params=l_params)
+
+            grads.append(layer_grads)
 
             # Calculate the current dA so that it will be used in next iteration
             dA_l_right = np.dot(l_params.W.T, dZ)
