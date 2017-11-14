@@ -74,6 +74,14 @@ default it ships with the following strategies:
 * `VarianceScalingWeightInitializer` : (Default with scale=2) It will initialize weights with random values following a 
 normal distribution scaled to ensure a specific variance per layer.
 
+
+### Regularization
+MyNN supports regularization but only one method per train. As it does not distinguish
+the stage of training and usage, you need to disable regularization after training
+in order to take reasonable results. Currenlty the following algorithms
+are supported:
+* `L2Regularization`: Regularization on the cost function using L2 norm on the weights of neurons.
+* `DropoutRegularization`: Inverse dropout with support for different keep_probability per layer.
 ### Installation
 MyNN can **only** work on `python >= 3.6`. It is proposed to use `virtualenv` to perform
 installation.
