@@ -133,18 +133,23 @@ class GradientDescentMomentum(GradientDescent):
         super().__init__(learning_rate=learning_rate, beta=beta)
         self._average_gradients = None
 
-    def step(self, values: Iterator[np.ndarray], grads: Iterator[np.ndarray]) -> List[np.ndarray]:
-        grads = list(grads)
-        values = list(values)
+    def _update_averages(self, grads):
         if self._average_gradients is None:
-            self._average_gradients = grads
-            return super().step(values, grads)
+            self._average_gradients = [
+                np.zeros(g.shape)
+                for g in grads
+            ]
 
         self._average_gradients = [
             average_grads * self.beta + g * (1.0 - self.beta)
 
             for average_grads, g in zip(self._average_gradients, grads)
         ]
+
+    def step(self, values: Iterator[np.ndarray], grads: Iterator[np.ndarray]) -> List[np.ndarray]:
+        grads = list(grads)
+        values = list(values)
+        self._update_averages(grads)
 
         results = [
             v - self.learning_rate * grad
