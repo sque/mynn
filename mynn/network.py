@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 
-from .optimizers import OptimizerBase, AdaptiveGradientDescentMomentum
+from .optimizers import OptimizerBase, Adam
 from .activation import BaseActivation
 from .initializers import WeightInitializerBase, VarianceScalingWeightInitializer
 from .loss import BaseLossFunction, CrossEntropyLoss
@@ -54,7 +54,7 @@ class FNN:
         self._layers_activation_func: List[BaseActivation] = []
         self._cached_activations = []
         self._prediction_proba_threshold = prediction_proba_threshold
-        self._optimizer: OptimizerBase = optimizer or AdaptiveGradientDescentMomentum()
+        self._optimizer: OptimizerBase = optimizer or Adam(learning_rate=0.001)
         self._initializer: WeightInitializerBase = initializer or VarianceScalingWeightInitializer(scale=2)
         self._loss_function: BaseLossFunction = loss_function or CrossEntropyLoss()
         self._regularization = regularization

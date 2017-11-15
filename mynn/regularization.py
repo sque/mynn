@@ -124,3 +124,6 @@ class DropoutRegularization(RegularizationBase):
         dropout_mask = layer_values.extras['dropout']
         dA = dA * dropout_mask
         return dA
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(keep_probs={self._keep_probs})"

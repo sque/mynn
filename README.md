@@ -58,15 +58,20 @@ the training can be faster, more effective. For this reason it is very beneficia
 each algorithm before choosing one. Sebastian Ruder has published [a very nice blog post](http://ruder.io/optimizing-gradient-descent/index.html#gradientdescentoptimizationalgorithms)
 where he presents in detail different optimization algorithms.
 
-MyNN is shipped with 3 different implementation of generic optimization strategies.
+MyNN is shipped with different implementation of optimization strategies.
 
 * `GradientDescent`: Typical Gradient Descent algorithm
 * `GradientDescentMomentum`: It works as the gradient descent but takes
 into account the previous grads in order to keep a momentum
-* `AdaptiveGradientDescent` (**Default**): A gradient descent that adapts learning rate per
+* `AdaptiveGradientDescent`: A gradient descent that adapts learning rate per
 optimized parameter. 
+* `RMSProp`: Gradient descent that adapts learnig rate based on the average of recent magnitudes of the gradients for 
+the weight.
+* `Adam` (**Default**): Adaptive moment estimation, an algorithm that encapsulates both the ideas
+of momentum and RMSProp.
 
 ### Weight Initialization
+
 The library supports different ways to initialize the weights of the linear functions. By
 default it ships with the following strategies:
 * `ConstantWeightInitializer` : It will initialize weight from a predefined list of constant values.
