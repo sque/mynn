@@ -72,8 +72,8 @@ class GradientDescent(OptimizerBase):
             for v, g in zip(values, grads)
         ]
 
-    def __str__(self):
-        return f"GD[rate={self.learning_rate}]"
+    def __repr__(self):
+        return f"GD(rate={self.learning_rate})"
 
 
 class RMSProp(GradientDescent):
@@ -81,32 +81,31 @@ class RMSProp(GradientDescent):
     Implementation of Root-Mean-Squared prop optimization algorithm
     """
 
-    def __init__(self, learning_rate, beta2: Optional[float] = 0.9):
+    def __init__(self, learning_rate, beta2: Optional[float] = 0.9, **extra_params):
         """
         Initialize gradient descent optimizer
         :param learning_rate: The base learning rate to adapt on gradient values
         :param beta: The beta2 factor of the rmsprop
         """
-        super().__init__(learning_rate=learning_rate, beta2=beta2)
+        super().__init__(learning_rate=learning_rate, beta2=beta2, **extra_params)
         self._squared_average_gradients = None
 
-    def _update_squared_averages(self, grads):
+    def _get_update_squared_averages(self, grads):
         if self._squared_average_gradients is None:
-            self._squared_average_gradients = [
-                np.zeros(g.shape)
+            return [
+                np.ones(g.shape) + SMALL_FLOAT
                 for g in grads
             ]
 
-        self._squared_average_gradients = [
+        return [
             average_grads * self.beta2 + (g**2) * (1.0 - self.beta2)
-
             for average_grads, g in zip(self._squared_average_gradients, grads)
         ]
 
     def step(self, values: Iterator[np.ndarray], grads: Iterator[np.ndarray]) -> List[np.ndarray]:
         grads = list(grads)
         values = list(values)
-        self._update_squared_averages(grads)
+        self._squared_average_gradients = self._get_update_squared_averages(grads)
 
         results = [
             v - self.learning_rate * grad/np.sqrt(average_grad + SMALL_FLOAT)
@@ -116,7 +115,7 @@ class RMSProp(GradientDescent):
         return results
 
     def __repr__(self):
-        return f"RMSProp(learning_rate={self.learning_rate},beta={self.beta})"
+        return f"RMSProp(learning_rate={self.learning_rate},beta2={self.beta2})"
 
 
 class GradientDescentMomentum(GradientDescent):
@@ -160,6 +159,37 @@ class GradientDescentMomentum(GradientDescent):
 
     def __repr__(self):
         return f"GDMomentum(learning_rate={self.learning_rate},beta={self.beta})"
+
+
+class Adam(RMSProp, GradientDescentMomentum):
+    """
+    Implementation of Adam algorithm (RMSProp + Momentum)
+    """
+
+    def __init__(self, learning_rate, beta: Optional[float] = 0.9, beta2: Optional[float] = 0.99, **extra_params):
+        """
+        Initialize optimizer
+        :param learning_rate: The base learning rate to adapt on gradient values
+        :param beta: The beta factor of the exponentially weighted averages
+        :param beta2: The beta factor of the root mean squared
+        """
+        super().__init__(learning_rate=learning_rate, beta=beta, beta2=beta2, **extra_params)
+
+    def step(self, values: Iterator[np.ndarray], grads: Iterator[np.ndarray]) -> List[np.ndarray]:
+        grads = list(grads)
+        values = list(values)
+        self._average_gradients = self._get_updated_averages(grads)
+        self._squared_average_gradients = self._get_update_squared_averages(grads)
+
+        results = [
+            v - self.learning_rate * grad / np.sqrt(sgrad + SMALL_FLOAT)
+            for v, grad, sgrad in zip(values, self._average_gradients, self._squared_average_gradients)
+        ]
+
+        return results
+
+    def __repr__(self):
+        return f"Adam(learning_rate={self.learning_rate},beta={self.beta},beta2={self.beta2})"
 
 
 class AdaptiveGradientDescentMomentum(GradientDescentMomentum):
@@ -211,5 +241,5 @@ class AdaptiveGradientDescentMomentum(GradientDescentMomentum):
 
         return results
 
-    def __str__(self):
+    def __repr__(self):
         return f"Adaptive(rate={self.min_learning_rate} - {self.max_learning_rate}],beta={self.beta})"
