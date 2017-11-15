@@ -80,6 +80,7 @@ class FNN:
         logger.debug(f"Initialized FNN network of #{len(self._layers_size) - 1} layers")
         logger.debug(f"  Layers sizes: {self._layers_size[1:]}")
         logger.debug(f"  Activation functions: {self._layers_activation_func[1:]}")
+        logger.debug(f"  Optimizer: {self._optimizer}")
         logger.debug(f"  Regularization: {self._regularization}")
 
     def _initialize_network(self):

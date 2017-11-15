@@ -81,33 +81,39 @@ class GradientDescentMomentum(GradientDescent):
     Implementation of Gradient Descent with momentum
     """
 
-    def __init__(self, learning_rate, old_grad_percent: Optional[float] = 0.2):
+    def __init__(self, learning_rate, beta: Optional[float] = 0.9):
         """
         Initialize gradient descent optimizer
         :param learning_rate: The base learning rate to adapt on gradient values
-        :param old_grad_percent: The percentage to use the previous values gradients
+        :param beta: The beta factor of the exponentially weighted averages
         """
-        super().__init__(learning_rate=learning_rate, old_grad_percent=old_grad_percent)
-        self._old_grads = None
+        super().__init__(learning_rate=learning_rate, beta=beta)
+        self._average_gradients = None
 
     def step(self, values: Iterator[np.ndarray], grads: Iterator[np.ndarray]) -> List[np.ndarray]:
         grads = list(grads)
         values = list(values)
-        if self._old_grads is None:
-            self._old_grads = grads
+        if self._average_gradients is None:
+            self._average_gradients = grads
             return super().step(values, grads)
 
+        self._average_gradients = [
+            average_grads * self.beta + g * (1.0 - self.beta)
+
+            for average_grads, g in zip(self._average_gradients, grads)
+        ]
+
         results = [
-            v - self.learning_rate * (g * (1.0 - self.old_grad_percent) + old_g * self.old_grad_percent)
-            for v, g, old_g in zip(values, grads, self._old_grads)
+            v - self.learning_rate * grad
+            for v, grad in zip(values, self._average_gradients)
         ]
 
         self._old_grads = grads
 
         return results
 
-    def __str__(self):
-        return f"GDMomentum[rate={self.learning_rate},old_%={self.old_grad_percent}]"
+    def __repr__(self):
+        return f"GDMomentum(learning_rate={self.learning_rate},beta={self.beta})"
 
 
 class AdaptiveGradientDescentMomentum(GradientDescent):
