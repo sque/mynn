@@ -124,23 +124,23 @@ class GradientDescentMomentum(GradientDescent):
     Implementation of Gradient Descent with momentum
     """
 
-    def __init__(self, learning_rate, beta: Optional[float] = 0.9):
+    def __init__(self, learning_rate, beta: Optional[float] = 0.9, **extra_params):
         """
         Initialize gradient descent optimizer
         :param learning_rate: The base learning rate to adapt on gradient values
         :param beta: The beta factor of the exponentially weighted averages
         """
-        super().__init__(learning_rate=learning_rate, beta=beta)
+        super().__init__(learning_rate=learning_rate, beta=beta, **extra_params)
         self._average_gradients = None
 
-    def _update_averages(self, grads):
+    def _get_updated_averages(self, grads):
         if self._average_gradients is None:
-            self._average_gradients = [
+            return [
                 np.zeros(g.shape)
                 for g in grads
             ]
 
-        self._average_gradients = [
+        return [
             average_grads * self.beta + g * (1.0 - self.beta)
 
             for average_grads, g in zip(self._average_gradients, grads)
@@ -149,7 +149,7 @@ class GradientDescentMomentum(GradientDescent):
     def step(self, values: Iterator[np.ndarray], grads: Iterator[np.ndarray]) -> List[np.ndarray]:
         grads = list(grads)
         values = list(values)
-        self._update_averages(grads)
+        self._average_gradients = self._get_updated_averages(grads)
 
         results = [
             v - self.learning_rate * grad
@@ -162,23 +162,23 @@ class GradientDescentMomentum(GradientDescent):
         return f"GDMomentum(learning_rate={self.learning_rate},beta={self.beta})"
 
 
-class AdaptiveGradientDescentMomentum(GradientDescent):
+class AdaptiveGradientDescentMomentum(GradientDescentMomentum):
     """
     Implementation of Gradient Descent with adaptive learning rate and momentum
     """
 
     def __init__(self, min_learning_rate: float = 1.2, max_learning_rate: float = 5,
-                 old_grad_percent: Optional[float] = 0.3):
+                 beta: Optional[float] = 0.9):
         """
         Initialize optimizer
         :param min_learning_rate: The maximum learning rate to be used. This is also the starting learning rate
         :param max_learning_rate: The minimum learning rate to be used.
-        :param old_grad_percent: The percentage to use the previous values gradients
+        :param beta: The beta factor of the exponentially weighted averages
         """
         super().__init__(learning_rate=max_learning_rate,
                          min_learning_rate=min_learning_rate,
                          max_learning_rate=max_learning_rate,
-                         old_grad_percent=old_grad_percent)
+                         beta=beta)
         self._old_learning_rates = None
         self._old_grads = None
 
@@ -186,34 +186,30 @@ class AdaptiveGradientDescentMomentum(GradientDescent):
 
         grads = list(grads)
         values = list(values)
-        if self._old_learning_rates is None:
-            logger.debug("AGDM: First iteration... fall back on classic GradientDescent")
+        new_averages = self._get_updated_averages(grads)
+        if self._average_gradients is None:
+            self._average_gradients = new_averages
             self._old_learning_rates = [np.ones(lr.shape) * self.max_learning_rate for lr in values]
-            self._old_grads = grads
-            return super().step(values, grads)
 
         learning_rates = []
         results = []
-        for v, g, old_g, learning_rate in zip(values, grads, self._old_grads, self._old_learning_rates):
+        for v, g, old_g, learning_rate in zip(values, new_averages, self._average_gradients, self._old_learning_rates):
 
             # If the optimizing is oscillating then reduce learning rate, else slightly increase.
             has_not_changed_side = np.equal(g / np.abs(g), old_g / np.abs(old_g))
             learning_rate = np.where(
                 has_not_changed_side,
-                np.minimum(self.max_learning_rate, learning_rate + (learning_rate / 16)),
-                np.maximum(self.min_learning_rate, learning_rate * 0.7)
+                np.minimum(self.max_learning_rate, learning_rate * 1.07),
+                np.maximum(self.min_learning_rate, learning_rate * 0.5)
             )
 
-            if self.old_grad_percent is None:
-                results.append(v - learning_rate * g)
-            else:
-                results.append(v - learning_rate * (g * (1.0 - self.old_grad_percent) + old_g * self.old_grad_percent))
+            results.append(v - learning_rate * g)
             learning_rates.append(learning_rate)
 
-        self._old_grads = grads
+        self._average_gradients = new_averages
         self._old_learning_rates = learning_rates
 
         return results
 
     def __str__(self):
-        return f"Adaptive[rate={self.min_learning_rate} - {self.max_learning_rate}],old_%={self.old_grad_percent}]"
+        return f"Adaptive(rate={self.min_learning_rate} - {self.max_learning_rate}],beta={self.beta})"
