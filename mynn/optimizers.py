@@ -2,7 +2,7 @@ import logging as _logging
 from typing import List, Optional, Iterator
 import numpy as np
 
-from ._const import BIG_FLOAT
+from ._const import BIG_FLOAT, SMALL_FLOAT
 
 
 logger = _logging.getLogger(__name__)
@@ -76,6 +76,49 @@ class GradientDescent(OptimizerBase):
         return f"GD[rate={self.learning_rate}]"
 
 
+class RMSProp(GradientDescent):
+    """
+    Implementation of Root-Mean-Squared prop optimization algorithm
+    """
+
+    def __init__(self, learning_rate, beta2: Optional[float] = 0.9):
+        """
+        Initialize gradient descent optimizer
+        :param learning_rate: The base learning rate to adapt on gradient values
+        :param beta: The beta2 factor of the rmsprop
+        """
+        super().__init__(learning_rate=learning_rate, beta2=beta2)
+        self._squared_average_gradients = None
+
+    def _update_squared_averages(self, grads):
+        if self._squared_average_gradients is None:
+            self._squared_average_gradients = [
+                np.zeros(g.shape)
+                for g in grads
+            ]
+
+        self._squared_average_gradients = [
+            average_grads * self.beta2 + (g**2) * (1.0 - self.beta2)
+
+            for average_grads, g in zip(self._squared_average_gradients, grads)
+        ]
+
+    def step(self, values: Iterator[np.ndarray], grads: Iterator[np.ndarray]) -> List[np.ndarray]:
+        grads = list(grads)
+        values = list(values)
+        self._update_squared_averages(grads)
+
+        results = [
+            v - self.learning_rate * grad/np.sqrt(average_grad + SMALL_FLOAT)
+            for v, average_grad, grad in zip(values, self._squared_average_gradients, grads)
+        ]
+
+        return results
+
+    def __repr__(self):
+        return f"RMSProp(learning_rate={self.learning_rate},beta={self.beta})"
+
+
 class GradientDescentMomentum(GradientDescent):
     """
     Implementation of Gradient Descent with momentum
@@ -107,8 +150,6 @@ class GradientDescentMomentum(GradientDescent):
             v - self.learning_rate * grad
             for v, grad in zip(values, self._average_gradients)
         ]
-
-        self._old_grads = grads
 
         return results
 
