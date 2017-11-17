@@ -202,52 +202,78 @@ class FNN:
         """
         return self._loss_function(A, Y)
 
-    def train(self, X: np.ndarray, Y: np.ndarray, iterations: int = 100) -> np.ndarray:
+    def train(self, X: np.ndarray, Y: np.ndarray,
+              epochs: int = 100,
+              mini_batch_size: Optional[int] = None) -> np.ndarray:
         """
         Train neural network on a given dataset. Training will be performed in batch mode,
         processing the whole dataset in one vectorized command per iteration.
         :param X: A 2-D array (n, m) with of m samples with n features.
         :param Y: The expected output of the model in (n, m) format where n is the number of
         output features and m the number of samples
-        :param iterations: The number of iterations to optimize parameters of the network
+        :param epochs: The number of epochs to optimize parameters of the network
+        :param mini_batch_size: The size of mini-batches to perform optimization. If None, it will perform batch
+        optimization
         :return: The final cost per iteration
         """
+        logger.debug(f"Training on X: {X.shape}, Y: {Y.shape} for {epochs} epochs.")
+
+        if X.shape[1] != Y.shape[1]:
+            raise ValueError("X and Y dataset do not contain the same number of samples.")
+
+        total_samples = X.shape[1]
+        if mini_batch_size is None:
+            # Disabling batching is like running in one batch
+            mini_batch_size = total_samples
+        else:
+            logger.debug(f"Enabling mini-batch optimization with size={mini_batch_size}")
+            shuffled_indices = np.random.permutation(total_samples)
+            logger.debug(f"Shuffling dataset for improved optimization performance")
+            X = X[:, shuffled_indices]
+            Y = Y[:, shuffled_indices]
 
         costs = []
-        for iter_count in range(iterations):
+        for epoch in range(epochs):
             if self._verbose_logging:
-                logger.debug(f"Starting train iteration: {iter_count} ")
+                logger.debug(f"Starting train iteration: {epoch} ")
 
-            # Forward and then backwards propagation to generate the gradients
-            self.forward(X)
-            grads = self.backwards(Y)
+            for batch_index, batch_start in enumerate(range(0, total_samples, mini_batch_size)):
 
-            # Calculate loss and give a chance to the optimizer to do something smarter
-            cost = self.loss(self._layer_values[-1].A, Y)
-            self._optimizer.update_loss(cost)
+                batch_end = batch_start + min(batch_start + mini_batch_size, total_samples)
+                X_batch = X[:, batch_start:batch_end]
+                Y_batch = Y[:, batch_start:batch_end]
 
-            # Parameters and grads are stored in named tuples per layer. Optimizer does not
-            # understand this structure but expects an iterable for values and for grads. In
-            # the next two blocks we unpack parameters in a flat format to optimize them and
-            # then repack to store them.
+                # Forward and then backwards propagation to generate the gradients
+                self.forward(X_batch)
+                grads = self.backwards(Y_batch)
 
-            # Unpack parameters and grads and trigger optimizer step
-            new_params_flatten = self._optimizer.step(
-                list(_utils.nested_chain_iterable(self._layers_parameters[1:], 1)),
-                list(_utils.nested_chain_iterable(grads, 1))
-            )
 
-            # Repack and update model parameters
-            for l, parameters in enumerate(_utils.grouped(new_params_flatten, 2), 1):
-                self._layers_parameters[l] = LayerParameters(
-                    W=parameters[0], b=parameters[1]
+                # Calculate loss and give a chance to the optimizer to do something smarter
+                cost = self.loss(self._layer_values[-1].A, Y_batch)
+                # self._optimizer.update_loss(cost, self._layers_parameters)
+
+                # Parameters and grads are stored in named tuples per layer. Optimizer does not
+                # understand this structure but expects an iterable for values and for grads. In
+                # the next two blocks we unpack parameters in a flat format to optimize them and
+                # then repack to store them.
+
+                # Unpack parameters and grads and trigger optimizer step
+                new_params_flatten = self._optimizer.step(
+                    list(_utils.nested_chain_iterable(self._layers_parameters[1:], 1)),
+                    list(_utils.nested_chain_iterable(grads, 1))
                 )
 
-            costs.append(cost)
-            if self._verbose_logging or iter_count % 100 == 0:
-                logger.debug(f"Iteration: {iter_count}, Cost: {cost}")
+                # Repack and update model parameters
+                for l, parameters in enumerate(_utils.grouped(new_params_flatten, 2), 1):
+                    self._layers_parameters[l] = LayerParameters(
+                        W=parameters[0], b=parameters[1]
+                    )
 
-        logger.debug(f"Finished training after {iter_count + 1} iterations with final cost: {cost}")
+                costs.append(cost)
+                if self._verbose_logging or ((epoch * mini_batch_size + batch_index) % 100 == 0):
+                    logger.debug(f"Epoch: {epoch}, Batch: {batch_index}, Cost: {cost}")
+
+        logger.debug(f"Finished training after {epoch + 1} iterations with final cost: {cost}")
 
         return np.array(costs)
 
