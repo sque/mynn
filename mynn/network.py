@@ -1,5 +1,6 @@
 import logging as _logging
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, ContextManager
+from contextlib import contextmanager
 
 import numpy as np
 
@@ -13,7 +14,6 @@ from .regularization import RegularizationBase
 
 
 logger = _logging.getLogger(__name__)
-
 
 
 class FNN:
@@ -53,11 +53,12 @@ class FNN:
         self._n_x: int = n_x
         self._layers_activation_func: List[BaseActivation] = []
         self._cached_activations = []
-        self._prediction_proba_threshold = prediction_proba_threshold
+        self._prediction_proba_threshold: float = prediction_proba_threshold
         self._optimizer: OptimizerBase = optimizer or Adam(learning_rate=0.001)
         self._initializer: WeightInitializerBase = initializer or VarianceScalingWeightInitializer(scale=2)
         self._loss_function: BaseLossFunction = loss_function or CrossEntropyLoss()
         self._regularization = regularization
+        self._enabled_regularization: bool = False
 
         # Parse layer configuration
         self._layers_size.append(n_x)
@@ -98,6 +99,21 @@ class FNN:
         """
         return self._optimizer
 
+    @contextmanager
+    def training_mode(self) -> ContextManager:
+        """
+        A context manager to instruct network that it enter training mode.
+
+        While in training mode, the network enables regularization
+        """
+        if self._verbose_logging:
+            logger.debug(f"Entering training mode, enabling regularization")
+        self._enabled_regularization = True
+        yield
+        self._enabled_regularization = False
+        if self._verbose_logging:
+            logger.debug(f"Leaving training mode, disabling regularization")
+
     def forward(self, X: np.ndarray) -> np.ndarray:
         """
         Perform a forward propagation on the neural network
@@ -115,13 +131,13 @@ class FNN:
                 self._layers_parameters[1:],
                 self._layers_activation_func[1:]):
 
-            Z = np.dot(l_params.W, A_previous) + l_params.b         # Calculate linear output
+            Z = np.dot(l_params.W, A_previous) + l_params.b       # Calculate linear output
             A = l_activation_func(Z)                              # Calculate activation function
 
             layer_values = LayerValues(Z=Z, A=A, extras={})
 
             # Regularization hook
-            if self._regularization:
+            if self._regularization and self._enabled_regularization:
                 layer_values = self._regularization.on_post_forward_propagation(
                     layer_values=layer_values,
                     layer_index=l_index,
@@ -162,7 +178,7 @@ class FNN:
                 dA_l_right = self._loss_function.derivative(A=l_values.A, Y=Y)
 
             # Regularization hook
-            if self._regularization:
+            if self._regularization and self._enabled_regularization:
                 dA_l_right = self._regularization.on_pre_backward_propagation(
                     dA=dA_l_right,
                     layer_index=l_index,
@@ -178,7 +194,7 @@ class FNN:
             layer_grads = LayerGrads(dW=dW, db=db)
 
             # Regularization hook
-            if self._regularization:
+            if self._regularization and self._enabled_regularization:
                 layer_grads = self._regularization.on_post_backward_propagation(
                     grads=layer_grads,
                     layer_index=l_index,
@@ -202,7 +218,9 @@ class FNN:
         """
         return self._loss_function(A, Y)
 
-    def train(self, X: np.ndarray, Y: np.ndarray,
+    def train(self,
+              X: np.ndarray,
+              Y: np.ndarray,
               epochs: int = 100,
               mini_batch_size: Optional[int] = None) -> np.ndarray:
         """
@@ -216,6 +234,7 @@ class FNN:
         optimization
         :return: The final cost per iteration
         """
+
         logger.debug(f"Training on X: {X.shape}, Y: {Y.shape} for {epochs} epochs.")
 
         if X.shape[1] != Y.shape[1]:
@@ -243,33 +262,34 @@ class FNN:
                 X_batch = X[:, batch_start:batch_end]
                 Y_batch = Y[:, batch_start:batch_end]
 
-                # Forward and then backwards propagation to generate the gradients
-                self.forward(X_batch)
-                grads = self.backwards(Y_batch)
+                with self.training_mode():
+                    # Forward and then backwards propagation to generate the gradients
+                    self.forward(X_batch)
+                    grads = self.backwards(Y_batch)
 
-                # Calculate loss and give a chance to the optimizer to do something smarter
-                cost = self.loss(self._layer_values[-1].A, Y_batch)
-                # self._optimizer.update_loss(cost, self._layers_parameters)
+                    # Calculate loss and give a chance to the optimizer to do something smarter
+                    cost = self.loss(self._layer_values[-1].A, Y_batch)
+                    # self._optimizer.update_loss(cost, self._layers_parameters)
 
-                # Parameters and grads are stored in named tuples per layer. Optimizer does not
-                # understand this structure but expects an iterable for values and for grads. In
-                # the next two blocks we unpack parameters in a flat format to optimize them and
-                # then repack to store them.
+                    # Parameters and grads are stored in named tuples per layer. Optimizer does not
+                    # understand this structure but expects an iterable for values and for grads. In
+                    # the next two blocks we unpack parameters in a flat format to optimize them and
+                    # then repack to store them.
 
-                # Unpack parameters and grads and trigger optimizer step
-                new_params_flatten = self._optimizer.step(
-                    values=list(_utils.nested_chain_iterable(self._layers_parameters[1:], 1)),
-                    grads=list(_utils.nested_chain_iterable(grads, 1)),
-                    epoch=epoch,
-                    mini_batch=batch_index,
-                    iteration=iteration
-                )
-
-                # Repack and update model parameters
-                for l, parameters in enumerate(_utils.grouped(new_params_flatten, 2), 1):
-                    self._layers_parameters[l] = LayerParameters(
-                        W=parameters[0], b=parameters[1]
+                    # Unpack parameters and grads and trigger optimizer step
+                    new_params_flatten = self._optimizer.step(
+                        values=list(_utils.nested_chain_iterable(self._layers_parameters[1:], 1)),
+                        grads=list(_utils.nested_chain_iterable(grads, 1)),
+                        epoch=epoch,
+                        mini_batch=batch_index,
+                        iteration=iteration
                     )
+
+                    # Repack and update model parameters
+                    for l, parameters in enumerate(_utils.grouped(new_params_flatten, 2), 1):
+                        self._layers_parameters[l] = LayerParameters(
+                            W=parameters[0], b=parameters[1]
+                        )
 
                 costs.append(cost)
                 if self._verbose_logging or (iteration % 100 == 0):
