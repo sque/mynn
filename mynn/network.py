@@ -238,7 +238,7 @@ class FNN:
                 logger.debug(f"Starting train iteration: {epoch} ")
 
             for batch_index, batch_start in enumerate(range(0, total_samples, mini_batch_size)):
-
+                iteration = epoch * mini_batch_size + batch_index
                 batch_end = batch_start + min(batch_start + mini_batch_size, total_samples)
                 X_batch = X[:, batch_start:batch_end]
                 Y_batch = Y[:, batch_start:batch_end]
@@ -246,7 +246,6 @@ class FNN:
                 # Forward and then backwards propagation to generate the gradients
                 self.forward(X_batch)
                 grads = self.backwards(Y_batch)
-
 
                 # Calculate loss and give a chance to the optimizer to do something smarter
                 cost = self.loss(self._layer_values[-1].A, Y_batch)
@@ -259,8 +258,11 @@ class FNN:
 
                 # Unpack parameters and grads and trigger optimizer step
                 new_params_flatten = self._optimizer.step(
-                    list(_utils.nested_chain_iterable(self._layers_parameters[1:], 1)),
-                    list(_utils.nested_chain_iterable(grads, 1))
+                    values=list(_utils.nested_chain_iterable(self._layers_parameters[1:], 1)),
+                    grads=list(_utils.nested_chain_iterable(grads, 1)),
+                    epoch=epoch,
+                    mini_batch=batch_index,
+                    iteration=iteration
                 )
 
                 # Repack and update model parameters
@@ -270,10 +272,10 @@ class FNN:
                     )
 
                 costs.append(cost)
-                if self._verbose_logging or ((epoch * mini_batch_size + batch_index) % 100 == 0):
+                if self._verbose_logging or (iteration % 100 == 0):
                     logger.debug(f"Epoch: {epoch}, Batch: {batch_index}, Cost: {cost}")
 
-        logger.debug(f"Finished training after {epoch + 1} iterations with final cost: {cost}")
+        logger.debug(f"Finished training after {epoch + 1} epochs with final cost: {cost}")
 
         return np.array(costs)
 
