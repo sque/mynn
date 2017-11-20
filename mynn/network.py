@@ -1,5 +1,5 @@
 import logging as _logging
-from typing import List, Optional, Tuple, ContextManager
+from typing import List, Optional, Tuple, ContextManager, Callable
 from contextlib import contextmanager
 
 import numpy as np
@@ -222,7 +222,8 @@ class FNN:
               X: np.ndarray,
               Y: np.ndarray,
               epochs: int = 100,
-              mini_batch_size: Optional[int] = None) -> np.ndarray:
+              mini_batch_size: Optional[int] = None,
+              iteration_callback: Callable[['FNN', 'int', 'int', 'int'], float] = None) -> np.ndarray:
         """
         Train neural network on a given dataset. Training will be performed in batch mode,
         processing the whole dataset in one vectorized command per iteration.
@@ -232,6 +233,9 @@ class FNN:
         :param epochs: The number of epochs to optimize parameters of the network
         :param mini_batch_size: The size of mini-batches to perform optimization. If None, it will perform batch
         optimization
+        :param iteration_callback: A function to be called per iteration with the following arguments:
+        (neural_network, epoch, mini_batch, iteration). The output of the function will be attached to the returned
+        costs.
         :return: The final cost per iteration
         """
 
@@ -292,7 +296,11 @@ class FNN:
                             W=parameters[0], b=parameters[1]
                         )
 
-                costs.append(cost)
+                if iteration_callback:
+                    extra_cost = iteration_callback(self, epoch, batch_index, iteration)
+                    costs.append((cost, extra_cost))
+                else:
+                    costs.append(cost)
                 if self._verbose_logging or (iteration % 100 == 0):
                     logger.debug(f"Epoch: {epoch}, Batch: {batch_index}, Cost: {cost}")
 
