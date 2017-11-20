@@ -28,6 +28,15 @@ class OptimizerBase:
             return self.params[item]
         raise AttributeError()
 
+    def reset(self) -> None:
+        """
+        Reset optimizer before starting training
+        :return:
+        """
+        self._last_loss = BIG_FLOAT
+        self.best_loss = BIG_FLOAT
+        self.best_solution = None
+
     def step(self, values: Iterator[np.ndarray],
              grads: Iterator[np.ndarray],
              epoch: int,
@@ -76,6 +85,9 @@ class GradientDescent(OptimizerBase):
         """
         super().__init__(learning_rate=learning_rate, **extra_params)
 
+    def reset(self) -> None:
+        super().reset()
+
     def step(self, values: Iterator[np.ndarray],
              grads: Iterator[np.ndarray],
              epoch: int,
@@ -102,6 +114,10 @@ class GradientDescentMomentum(GradientDescent):
         :param beta: The beta factor of the exponentially weighted averages
         """
         super().__init__(learning_rate=learning_rate, beta=beta, **extra_params)
+        self._average_gradients = None
+
+    def reset(self) -> None:
+        super().reset()
         self._average_gradients = None
 
     def _get_updated_averages(self, grads: List[np.ndarray], iteration: int) -> List[np.ndarray]:
@@ -155,6 +171,10 @@ class RMSProp(GradientDescent):
         :param beta: The beta2 factor of the rmsprop
         """
         super().__init__(learning_rate=learning_rate, beta2=beta2, **extra_params)
+        self._squared_average_gradients = None
+
+    def reset(self) -> None:
+        super().reset()
         self._squared_average_gradients = None
 
     def _get_update_squared_averages(self, grads: List[np.ndarray], iteration: int) -> List[np.ndarray]:
@@ -247,6 +267,11 @@ class AdaptiveGradientDescentMomentum(GradientDescentMomentum):
                          min_learning_rate=min_learning_rate,
                          max_learning_rate=max_learning_rate,
                          beta=beta)
+        self._old_learning_rates = None
+        self._old_grads = None
+
+    def reset(self) -> None:
+        super().reset()
         self._old_learning_rates = None
         self._old_grads = None
 

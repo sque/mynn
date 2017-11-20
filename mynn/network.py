@@ -251,6 +251,7 @@ class FNN:
             X = X[:, shuffled_indices]
             Y = Y[:, shuffled_indices]
 
+        self._optimizer.reset()
         costs = []
         for epoch in range(epochs):
             if self._verbose_logging:
