@@ -205,8 +205,8 @@ class RMSProp(GradientDescent):
         self._squared_average_gradients = self._get_update_squared_averages(grads, iteration + 1)
 
         results = [
-            v - self.learning_rate * grad/np.sqrt(average_grad + SMALL_FLOAT)
-            for v, average_grad, grad in zip(values, self._squared_average_gradients, grads)
+            v - self.learning_rate * point_grad/(np.sqrt(squared_average_grad) + SMALL_FLOAT)
+            for v, squared_average_grad, point_grad in zip(values, self._squared_average_gradients, grads)
         ]
 
         return results
@@ -240,7 +240,7 @@ class Adam(RMSProp, GradientDescentMomentum):
         self._squared_average_gradients = self._get_update_squared_averages(grads, iteration + 1)
 
         results = [
-            v - self.learning_rate * grad / (np.sqrt(sgrad)  + SMALL_FLOAT)
+            v - self.learning_rate * grad / (np.sqrt(sgrad) + SMALL_FLOAT)
             for v, grad, sgrad in zip(values, self._average_gradients, self._squared_average_gradients)
         ]
 
