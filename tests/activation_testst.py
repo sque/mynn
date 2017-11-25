@@ -1,72 +1,114 @@
+from typing import Callable
 import unittest
-from mynn.activation import TanhActivation, SigmoidActivation, ReLUActivation
+import numpy as np
+from mynn.activation import TanhActivation, SigmoidActivation, ReLUActivation, SoftmaxActivation
+
+
+def approximated_derivative(f: Callable, point_x, e=0.1e-8):
+    """
+    Approximate derivative
+    :param f: The function to calculate derivative
+    :param point_x: The point of the function f to calculate derivative
+    :param e: The
+    """
+    return (f(point_x + e) - f(point_x - e)) / (2*e)
 
 
 class SigmoidTestCase(unittest.TestCase):
 
+    def setUp(self):
+        self.s = SigmoidActivation()
+        
     def test_forward(self):
-        s = SigmoidActivation()
 
-        self.assertAlmostEqual(s(-1e+10), 0.0, 2)
-        self.assertAlmostEqual(s(-1), 0.26894, 3)
-        self.assertEqual(s(0), 0.5)
-        self.assertAlmostEqual(s(1), 1 - 0.26894, 3)
-        self.assertAlmostEqual(s(1e+10), 1.000, 2)
+        self.assertAlmostEqual(self.s(-1e+10), 0.0, 2)
+        self.assertAlmostEqual(self.s(-1), 0.26894, 3)
+        self.assertEqual(self.s(0), 0.5)
+        self.assertAlmostEqual(self.s(1), 1 - 0.26894, 3)
+        self.assertAlmostEqual(self.s(1e+10), 1.000, 2)
 
     def test_derivative(self):
 
-        s = SigmoidActivation()
-        self.assertAlmostEqual(s.derivative(-1e+10), 0.0, 2)
-        self.assertAlmostEqual(s.derivative(+1e+10), 0.0, 2)
-        self.assertAlmostEqual(s.derivative(-2), 0.1049, 2)
-        self.assertAlmostEqual(s.derivative(0), 0.25)
-        self.assertAlmostEqual(s.derivative(2), 0.1049, 2)
+        self.assertAlmostEqual(self.s.derivative(-1e+10), 0.0, 2)
+        self.assertAlmostEqual(self.s.derivative(+1e+10), 0.0, 2)
+        self.assertAlmostEqual(self.s.derivative(-2), 0.1049, 2)
+        self.assertAlmostEqual(self.s.derivative(0), 0.25)
+        self.assertAlmostEqual(self.s.derivative(2), 0.1049, 2)
+
+    def test_gradient_checking(self):
+
+        points = [-1e+10, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, +1e+10]
+
+        for p in points:
+            self.assertTrue(np.isclose(self.s.derivative(p), approximated_derivative(self.s, p)))
+
 
 
 class TanhTestCase(unittest.TestCase):
 
-    def test_forward(self):
-        t = TanhActivation()
+    def setUp(self):
+        self.s = TanhActivation()
 
-        self.assertAlmostEqual(t(-1e+10), -1.0, 2)
-        self.assertAlmostEqual(t(-1), -0.7615, 3)
-        self.assertEqual(t(0), 0)
-        self.assertAlmostEqual(t(1), 0.7615, 3)
-        self.assertAlmostEqual(t(1e+10), 1.0, 2)
+    def test_forward(self):
+
+
+        self.assertAlmostEqual(self.s(-1e+10), -1.0, 2)
+        self.assertAlmostEqual(self.s(-1), -0.7615, 3)
+        self.assertEqual(self.s(0), 0)
+        self.assertAlmostEqual(self.s(1), 0.7615, 3)
+        self.assertAlmostEqual(self.s(1e+10), 1.0, 2)
 
     def test_derivative(self):
 
-        t = TanhActivation()
-        self.assertAlmostEqual(t.derivative(-1e+10), 0.0, 2)
-        self.assertAlmostEqual(t.derivative(-2), 0.0706, 2)
-        self.assertAlmostEqual(t.derivative(-1), 0.41997, 2)
-        self.assertAlmostEqual(t.derivative(0), 1)
-        self.assertAlmostEqual(t.derivative(1), 0.41997, 2)
-        self.assertAlmostEqual(t.derivative(2), 0.0706, 2)
-        self.assertAlmostEqual(t.derivative(+1e+10), 0.0, 2)
+        self.assertAlmostEqual(self.s.derivative(-1e+10), 0.0, 2)
+        self.assertAlmostEqual(self.s.derivative(-2), 0.0706, 2)
+        self.assertAlmostEqual(self.s.derivative(-1), 0.41997, 2)
+        self.assertAlmostEqual(self.s.derivative(0), 1)
+        self.assertAlmostEqual(self.s.derivative(1), 0.41997, 2)
+        self.assertAlmostEqual(self.s.derivative(2), 0.0706, 2)
+        self.assertAlmostEqual(self.s.derivative(+1e+10), 0.0, 2)
+
+    def test_gradient_checking(self):
+
+        points = [-1e+10, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, +1e+10]
+
+        for p in points:
+            self.assertTrue(np.isclose(self.s.derivative(p), approximated_derivative(self.s, p)))
 
 
 class ReluTestCase(unittest.TestCase):
 
+    def setUp(self):
+        self.s = ReLUActivation()
+        
     def test_forward(self):
-        rl = ReLUActivation()
 
-        self.assertAlmostEqual(rl(-1e+10), 0.0, 2)
-        self.assertAlmostEqual(rl(-1), 0.0, 3)
-        self.assertEqual(rl(0), 0)
-        self.assertAlmostEqual(rl(1), 1, 3)
-        self.assertAlmostEqual(rl(1e+10), 1e+10, 2)
+        self.assertAlmostEqual(self.s(-1e+10), 0.0, 2)
+        self.assertAlmostEqual(self.s(-1), 0.0, 3)
+        self.assertEqual(self.s(0), 0)
+        self.assertAlmostEqual(self.s(1), 1, 3)
+        self.assertAlmostEqual(self.s(1e+10), 1e+10, 2)
 
     def test_derivative(self):
 
-        t = ReLUActivation()
-        self.assertAlmostEqual(t.derivative(-1e+10), 0.0, 2)
-        self.assertAlmostEqual(t.derivative(-2), 0.0, 2)
-        self.assertAlmostEqual(t.derivative(-1), 0.0, 2)
-        self.assertAlmostEqual(t.derivative(0), 0)
-        self.assertAlmostEqual(t.derivative(1), 1, 2)
-        self.assertAlmostEqual(t.derivative(2), 1, 2)
-        self.assertAlmostEqual(t.derivative(+1e+10), 1, 2)
+        self.assertAlmostEqual(self.s.derivative(-1e+10), 0.0, 2)
+        self.assertAlmostEqual(self.s.derivative(-2), 0.0, 2)
+        self.assertAlmostEqual(self.s.derivative(-1), 0.0, 2)
+        self.assertAlmostEqual(self.s.derivative(0), 0)
+        self.assertAlmostEqual(self.s.derivative(1), 1, 2)
+        self.assertAlmostEqual(self.s.derivative(2), 1, 2)
+        self.assertAlmostEqual(self.s.derivative(+1e+10), 1, 2)
+
+    def test_gradient_checking(self):
+
+        points = [-1e+10, -5, -4, -3, -2, -1, 0.1, 1, 2, 3, 4, 5, +1e+10]
+        epsilons = [0.1e-8] * (len(points) - 1) + [1]
+
+
+        for p, e in zip(points, epsilons):
+            self.assertTrue(np.isclose(self.s.derivative(p), approximated_derivative(self.s, p, e)))
+
+
 
 
 if __name__ == '__main__':
