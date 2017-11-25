@@ -1,6 +1,6 @@
 import numpy as np
 
-from ._const import FloatOrArray
+from ._const import FloatOrArray, SMALL_FLOAT
 
 
 class BaseActivation:
@@ -44,6 +44,29 @@ class SigmoidActivation(BaseActivation):
 
     def derivative(self, Z: FloatOrArray) -> FloatOrArray:
         return self(Z) * (1 - self(Z))
+
+
+class SoftmaxActivation(BaseActivation):
+    """
+    Implementation of softmax activation function
+    """
+
+    def __call__(self, Z: FloatOrArray) -> FloatOrArray:
+        t = np.exp(Z)
+        return t / np.sum(t, axis=0, keepdims=True)
+
+    def derivative(self, Z: FloatOrArray) -> FloatOrArray:
+        # Computing the derivative of softmax is not that easy...
+        # Also it is more computentially efficient to use dZ = AL - Y when combining
+        # Singmoid/Softmax with CrossEntropy loss function
+        raise NotImplementedError()
+
+        # For reference this was an attempt to implement jacobian
+        # J = - Z[..., None] * Z[:, None, :]  # off-diagonal Jacobian
+        # iy, ix = np.diag_indices_from(J[0])
+        # J[:, iy, ix] = Z * (1. - Z)  # diagonal
+        # return J.sum(axis=1)  # sum across-rows for each sample
+
 
 
 class TanhActivation(BaseActivation):

@@ -109,6 +109,24 @@ class ReluTestCase(unittest.TestCase):
             self.assertTrue(np.isclose(self.s.derivative(p), approximated_derivative(self.s, p, e)))
 
 
+class SoftmaxTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.s = SoftmaxActivation()
+        self.examples_in_ = np.array([
+            [1.0, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0],
+
+        ]).T
+
+        self.examples_out_ = np.array([
+            [0.02364, 0.06426, 0.17468, 0.47483, 0.02364, 0.06426, 0.17468]
+            ]
+        ).T
+
+    def test_forward(self):
+
+        self.assertTrue(np.all(np.isclose(self.s(self.examples_in_), self.examples_out_, rtol=1.e-04)))
+
 
 
 if __name__ == '__main__':
