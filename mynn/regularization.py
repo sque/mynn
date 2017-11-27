@@ -53,7 +53,7 @@ class L2Regularization(RegularizationBase):
     Implementation of L2 regularization technique.
     """
 
-    def __init__(self, lambd:float):
+    def __init__(self, lambd: float):
         """
         Initialize L2 regularizer
         :param lambd: The λ term of the regularization
@@ -86,7 +86,7 @@ class DropoutRegularization(RegularizationBase):
             raise TypeError(f"Unexpected type {type(keep_probs)} for keep_probs. Expecting float or list of floats")
         self._keep_probs = keep_probs
 
-    def keep_proba(self, layer_index:int) -> float:
+    def keep_proba(self, layer_index: int) -> float:
         """
         Get keep probability for a specific layer index
         :param layer_index: The index of the layer (1-based) that requesting keep probability
@@ -97,8 +97,8 @@ class DropoutRegularization(RegularizationBase):
         return self._keep_probs[layer_index - 1]
 
     def on_post_forward_propagation(self, layer_values: LayerValues,
-                                 layer_index:int,
-                                 layer_params:LayerParameters) -> LayerValues:
+                                    layer_index: int,
+                                    layer_params: LayerParameters) -> LayerValues:
         keep_proba = self.keep_proba(layer_index=layer_index)
         layer_values.extras['dropout_keep_proba'] = keep_proba
         if keep_proba == 1:

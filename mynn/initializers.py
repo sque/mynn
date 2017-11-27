@@ -5,7 +5,7 @@ import numpy as np
 class WeightInitializerBase:
     pass
 
-    def get_initial_weight(self, l:int, n:int, n_left:int) -> Tuple[np.ndarray, np.ndarray]:
+    def get_initial_weight(self, l: int, n: int, n_left: int) -> Tuple[np.ndarray, np.ndarray]:
         """
         Get the initial weights of the linear functions Z
         :param l: The level of the layer 1-indexed
@@ -30,7 +30,7 @@ class ConstantWeightInitializer(WeightInitializerBase):
         self._weights = weights
 
     def get_initial_weight(self, l: int, n: int, n_left: int) -> Tuple[np.ndarray, np.ndarray]:
-        layer_weights = self._weights[l-1]
+        layer_weights = self._weights[l - 1]
         b = np.zeros((n, 1))
 
         if isinstance(layer_weights, (float, int)):

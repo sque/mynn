@@ -5,7 +5,6 @@ from mynn.initializers import ConstantWeightInitializer, NormalWeightInitializer
 
 
 class ConstantWeightInitializerTestCase(unittest.TestCase):
-
     def test_out_of_index(self):
         i = ConstantWeightInitializer([1, 2, 3])
         with self.assertRaises(IndexError):
@@ -17,7 +16,7 @@ class ConstantWeightInitializerTestCase(unittest.TestCase):
         W, b = i.get_initial_weight(1, 4, 5)
 
         self.assertTrue(np.all(
-            W == np.ones((4,5))
+            W == np.ones((4, 5))
         ))
 
         self.assertTrue(np.all(
@@ -50,7 +49,6 @@ class ConstantWeightInitializerTestCase(unittest.TestCase):
 
 
 class NormalWeightInitializerTestCase(unittest.TestCase):
-
     def test_get_initial_weights(self):
         np.random.seed(1)
         i = NormalWeightInitializer()
@@ -58,9 +56,9 @@ class NormalWeightInitializerTestCase(unittest.TestCase):
         W, b = i.get_initial_weight(1, 4, 5)
         self.assertEqual(W.shape, (4, 5))
         random_normal = np.array([[1.62434536, -0.61175641, -0.52817175, -1.07296862, 0.86540763],
-                               [-2.3015387, 1.74481176, -0.7612069, 0.3190391, -0.24937038],
-                               [1.46210794, -2.06014071, -0.3224172, -0.38405435, 1.13376944],
-                               [-1.09989127, -0.17242821, -0.87785842, 0.04221375, 0.58281521]])
+                                  [-2.3015387, 1.74481176, -0.7612069, 0.3190391, -0.24937038],
+                                  [1.46210794, -2.06014071, -0.3224172, -0.38405435, 1.13376944],
+                                  [-1.09989127, -0.17242821, -0.87785842, 0.04221375, 0.58281521]])
 
         self.assertTrue(np.allclose(W, random_normal))
 
@@ -68,8 +66,8 @@ class NormalWeightInitializerTestCase(unittest.TestCase):
             b == np.zeros((4, 1))
         ))
 
-class VarianceScalingWeightInitializerTestCase(unittest.TestCase):
 
+class VarianceScalingWeightInitializerTestCase(unittest.TestCase):
     def setUp(self):
         self.normal_random = np.array([[1.62434536, -0.61175641, -0.52817175, -1.07296862, 0.86540763],
                                        [-2.3015387, 1.74481176, -0.7612069, 0.3190391, -0.24937038],

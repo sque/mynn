@@ -1,6 +1,6 @@
 import numpy as np
 
-from ._const import FloatOrArray, SMALL_FLOAT
+from ._const import FloatOrArray
 
 
 class BaseActivation:
@@ -52,7 +52,7 @@ class SoftmaxActivation(BaseActivation):
     """
 
     def __call__(self, Z: FloatOrArray) -> FloatOrArray:
-        t = np.exp(Z- np.max(Z))  # Normalize with a constan
+        t = np.exp(Z - np.max(Z))  # Normalize with a constant
         return t / np.sum(t, axis=0, keepdims=True)
 
     def derivative(self, Z: FloatOrArray) -> FloatOrArray:
@@ -66,7 +66,6 @@ class SoftmaxActivation(BaseActivation):
         # iy, ix = np.diag_indices_from(J[0])
         # J[:, iy, ix] = Z * (1. - Z)  # diagonal
         # return J.sum(axis=1)  # sum across-rows for each sample
-
 
 
 class TanhActivation(BaseActivation):
