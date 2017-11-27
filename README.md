@@ -52,6 +52,7 @@ and a derivative estimation. The package is shipped with 3 implementations of ac
 * `ReLU`
 * `Tanh`
 * `Sigmoid`
+* `Softmax`
 
 ### Optimization strategy
 The optimization strategy is a core component for any optimization problem. Depending the strategy
@@ -88,8 +89,20 @@ in order to take reasonable results. Currenlty the following algorithms
 are supported:
 * `L2Regularization`: Regularization on the cost function using L2 norm on the weights of neurons.
 * `DropoutRegularization`: Inverse dropout with support for different keep_probability per layer.
+
+### Encoding/Decoding
+There are many problems that demand encoding of variable `Y` at train time and `decoding` at prediction time.
+The following en(de)coders are currently supported by MyNN:
+* `ThresholdBinaryEncoderDecoder`: The most basic encoder for binary classification problem. It can encode
+class labels to probabilities `0.0`, `1.0` and can decode probabilities to labels using a standard
+threshold.
+* `OneHotEncoderDecoder`: OneHot encoder can be used for multi-class classification problem where the
+class is a single value in `Y` variable. At encoding it will turn each value `Y` to one-hot vector of `C` size
+(where `C = len(classes)`)with only one element being `1.0`. At decoding it will translate a probability vector to a unique value using
+hard-max.
+
 ### Installation
-MyNN can **only** work on `python >= 3.6`. It is proposed to use `virtualenv` to perform
+MyNN **only** works for `python >= 3.6`. It is proposed to use `virtualenv` to perform
 installation.
 
 ```sh

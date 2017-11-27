@@ -7,7 +7,7 @@ class StandardScaler:
     Scale features by removing the mean and scaling to unit variance
     """
 
-    def __init__(self, mean:Optional[float]=None, variance:Optional[float]=None) -> None:
+    def __init__(self, mean: Optional[float] = None, variance: Optional[float] = None) -> None:
         """
         Initialize scaler
         :param mean: This is the mean of the original data
@@ -16,7 +16,7 @@ class StandardScaler:
         self._mean = mean
         self._variance = variance
 
-    def train(self, X:np.ndarray) -> None:
+    def train(self, X: np.ndarray) -> None:
         """
         Train scaler on a dataset. This will estimate the mean and variance of the dataset
         :param X: The dataset to train scaler
@@ -24,7 +24,7 @@ class StandardScaler:
         self._mean = np.mean(X, axis=1, keepdims=True)
         self._variance = np.var(X, axis=1, keepdims=True)
 
-    def scale(self, X:np.ndarray) -> np.ndarray:
+    def scale(self, X: np.ndarray) -> np.ndarray:
         """
         Scale a dataset based on the mean and variance that was previously trained.
         :param X: The dataset to scale

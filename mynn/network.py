@@ -7,6 +7,7 @@ import numpy as np
 from .optimizers import OptimizerBase, Adam
 from .activation import BaseActivation
 from .initializers import WeightInitializerBase, VarianceScalingWeightInitializer
+from .endecoders import LabelEncoderDecoder
 from .loss import BaseLossFunction, CrossEntropyLoss
 from . import _utils
 from .value_types import LayerParameters, LayerValues, LayerGrads
@@ -23,7 +24,7 @@ class FNN:
 
     def __init__(self, layers_config: List[Tuple[int, BaseActivation]],
                  n_x: int,
-                 prediction_proba_threshold: int = 0.5,
+                 output_encoder_decoder: Optional[LabelEncoderDecoder] = None,
                  optimizer: Optional[OptimizerBase] = None,
                  loss_function: Optional[BaseLossFunction] = None,
                  verbose_logging: bool = False,
@@ -36,7 +37,8 @@ class FNN:
         :param layers_config: A list of tuples describing each layer starting from the first hidden till the output
         layer. The tuple must consist of the number of nodes and the class of the activation function to use.
         :param n_x: Number of input features
-        :param prediction_proba_threshold: The probability threshold to select one class or another.
+        :param output_encoder_decoder: An encoder/decoder that will be used to encode y_variable before training
+        and decode on predict() function.
         :param optimizer: The optimizer object to use for optimization. If not defined it will use the Adaptive GD
         with default parameters.
         :param loss_function: The loss function to use for training the neural network. If not set the default
@@ -53,7 +55,7 @@ class FNN:
         self._n_x: int = n_x
         self._layers_activation_func: List[BaseActivation] = []
         self._cached_activations = []
-        self._prediction_proba_threshold: float = prediction_proba_threshold
+        self._output_encoder_decoder = output_encoder_decoder
         self._optimizer: OptimizerBase = optimizer or Adam(learning_rate=0.001)
         self._initializer: WeightInitializerBase = initializer or VarianceScalingWeightInitializer(scale=2)
         self._loss_function: BaseLossFunction = loss_function or CrossEntropyLoss()
@@ -83,6 +85,8 @@ class FNN:
         logger.debug(f"  Activation functions: {self._layers_activation_func[1:]}")
         logger.debug(f"  Optimizer: {self._optimizer}")
         logger.debug(f"  Regularization: {self._regularization}")
+        if self._output_encoder_decoder:
+            logger.debug(f"  Encoder/Decoder: {self._output_encoder_decoder}")
 
     def _initialize_network(self):
 
@@ -98,6 +102,14 @@ class FNN:
         Get access to optimizer object
         """
         return self._optimizer
+
+    @property
+    def output_encoder_decoder(self) -> Optional[LabelEncoderDecoder]:
+        """
+        Get the output encoder decoder.
+        :return:
+        """
+        return self._output_encoder_decoder
 
     @contextmanager
     def training_mode(self) -> ContextManager:
@@ -255,6 +267,11 @@ class FNN:
             X = X[:, shuffled_indices]
             Y = Y[:, shuffled_indices]
 
+        if self._output_encoder_decoder:
+            # Encode Y variable
+            logger.debug(f"Encoding Y variable")
+            Y = self._output_encoder_decoder.encode(Y)
+
         self._optimizer.reset()
         costs = []
         for epoch in range(epochs):
@@ -315,4 +332,8 @@ class FNN:
         :return:
         """
         A_last = self.forward(X)
-        return np.array(A_last > self._prediction_proba_threshold, dtype='int')
+        if self.output_encoder_decoder is None:
+            return A_last
+
+        # Decode neural network output and return results
+        return self.output_encoder_decoder.decode(A_last)

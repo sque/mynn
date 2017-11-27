@@ -64,6 +64,14 @@ class BinaryEncoderTestCase(unittest.TestCase):
             [[2, 2, 2, 2, 2, 2, 15]]
         )
 
+    def test_repr(self):
+        d = endecoders.ThresholdBinaryEncoderDecoder(
+            probability_threshold=0.7,
+            class_a=15,
+            class_b=2
+        )
+        self.assertIsInstance(repr(d), str)
+
 
 class OneHotDecoderTestCase(unittest.TestCase):
     def test_default_constructor(self):
@@ -141,6 +149,9 @@ class OneHotDecoderTestCase(unittest.TestCase):
             expected_output.tolist()
         )
 
+    def test_repr(self):
+        d = endecoders.OneHotEncoderDecoder(classes=['A', 'B'])
+        self.assertIsInstance(repr(d), str)
 
 if __name__ == '__main__':
     unittest.main()

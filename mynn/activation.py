@@ -52,7 +52,7 @@ class SoftmaxActivation(BaseActivation):
     """
 
     def __call__(self, Z: FloatOrArray) -> FloatOrArray:
-        t = np.exp(Z)
+        t = np.exp(Z- np.max(Z))  # Normalize with a constan
         return t / np.sum(t, axis=0, keepdims=True)
 
     def derivative(self, Z: FloatOrArray) -> FloatOrArray:

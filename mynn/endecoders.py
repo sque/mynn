@@ -48,6 +48,10 @@ class ThresholdBinaryEncoderDecoder(LabelEncoderDecoder):
                         self.class_a,
                         self.class_b).reshape(1, -1)
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}(probability_threshold={self.probability_threshold}, " \
+               f"class_a={self.class_a}, class_b={self.class_b})"
+
 
 class OneHotEncoderDecoder(LabelEncoderDecoder):
     """
@@ -84,3 +88,5 @@ class OneHotEncoderDecoder(LabelEncoderDecoder):
 
         return self.classes[indices].reshape(1, -1)
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}(classes={self.classes})"
