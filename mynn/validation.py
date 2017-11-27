@@ -1,4 +1,4 @@
-from typing import Dict, Tuple, List, Optional
+from typing import Dict, Tuple, List, Optional, Any
 
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
@@ -7,7 +7,7 @@ from mynn.loss import CrossEntropyLoss
 from mynn.network import FNN
 
 
-def prediction_performance(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, np.ndarray]:
+def prediction_performance(y_true: np.ndarray, y_pred: np.ndarray, average: str = 'binary') -> Dict[str, np.ndarray]:
     """
     Calculate multiple prediction performance scores for a given dataset.
 
@@ -15,6 +15,8 @@ def prediction_performance(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, 
 
     :param y_true: The ground truth dataset
     :param y_pred: The prediction output
+    :param average: This parameter is required for multiclass/multilabel targets in `precision`, `recall`,
+    `f1`, `cross_entropy`
     :return: A set of metrics mapped by their friendly name.
     """
     y_true = y_true.squeeze()
@@ -22,31 +24,35 @@ def prediction_performance(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, 
 
     return {
         'accuracy': accuracy_score(y_true, y_pred),
-        'precision': precision_score(y_true, y_pred),
-        'recall': recall_score(y_true, y_pred),
-        'f1': f1_score(y_true, y_pred),
+        'precision': precision_score(y_true, y_pred, average=average),
+        'recall': recall_score(y_true, y_pred, average=average),
+        'f1': f1_score(y_true, y_pred, average=average),
         'cross_entropy': CrossEntropyLoss()(y_pred, y_true)
     }
 
 
-def performance_training_callback(datasets_x: List[np.ndarray], datasets_y: List[np.ndarray], every_nth_iteration=100):
+def performance_training_callback(datasets_x: List[np.ndarray], datasets_y: List[np.ndarray], every_nth_iteration=100,
+                                  prediction_kwargs: Optional[Dict[str, Any]]=None):
     """
     Training callback to generate extra performance metrics against multiple datasets.
     :param datasets_x: A list of input features for each dataset
     :param datasets_y: A list of the output variables for each dataset
     :param every_nth_iteration: The period of training iterations for which the stats will be calculated
+    :param prediction_kwargs: Arguments to set for prediction_performance
     :return: The callback to be used by FNN.train()
     """
+
+    prediction_kwargs = prediction_kwargs or {}
 
     if len(datasets_x) != len(datasets_y):
         raise ValueError("Datasets X and Y must be of the same size.")
 
-    def _iteration_callback(nn: FNN, epoch:int, mini_batch:int, iteration:int) -> Tuple[Optional[Dict], ...]:
+    def _iteration_callback(nn: FNN, epoch: int, mini_batch: int, iteration: int) -> Tuple[Optional[Dict], ...]:
         if iteration % every_nth_iteration != 0:
             return (None, ) * len(datasets_x)
 
         stats = tuple(
-            prediction_performance(dataset_y, nn.predict(dataset_x))
+            prediction_performance(dataset_y, nn.predict(dataset_x), **prediction_kwargs)
             for dataset_x, dataset_y in zip(datasets_x, datasets_y)
         )
 
