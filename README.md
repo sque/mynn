@@ -10,6 +10,7 @@ A useful tool if you are interested to discover the intuition of neural networks
 For quick demo you can see the notebooks with a detailed example on how to train and use a NN:
  * [Feedforward NN on binary classification problem](docs/FNN_on_binary_classification_of_a_flower.ipynb)
  * [Using mini-batches for training](docs/FNN_hyper_optimization_minibatches.ipynb)
+ * [Multi-class classification with FNN](docs/FNN_multi_class.ipynb)
 
 Or you can see the following snippet on how to train a binary classifier of 2 hidden layers (50, 20 nodes) with `tanh` 
 activation function for the hidden layers and `sigmoid` for the output on a dataset

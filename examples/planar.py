@@ -65,7 +65,7 @@ def load_spyral_dataset(N=100):
     return X, y
 
 
-def plot_decision_boundary(model, X, y):
+def plot_decision_boundary(model, X, y, ax):
     # Set min and max values and give it some padding
     x_min, x_max = X[0, :].min() - 1, X[0, :].max() + 1
     y_min, y_max = X[1, :].min() - 1, X[1, :].max() + 1
@@ -76,7 +76,7 @@ def plot_decision_boundary(model, X, y):
     Z = model(np.c_[xx.ravel(), yy.ravel()])
     Z = Z.reshape(xx.shape)
     # Plot the contour and training examples
-    plt.contourf(xx, yy, Z, cmap=plt.cm.Spectral)
-    plt.ylabel('x2')
-    plt.xlabel('x1')
-    plt.scatter(X[0, :], X[1, :], c=y, cmap=plt.cm.Spectral)
+    ax.contourf(xx, yy, Z, cmap=plt.cm.Spectral)
+    ax.set_ylabel('x2')
+    ax.set_xlabel('x1')
+    ax.scatter(X[0, :], X[1, :], c=y, cmap=plt.cm.Spectral)
