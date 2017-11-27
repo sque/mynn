@@ -20,19 +20,19 @@ class RegularizationBase:
         """
         return layer_values
 
-    def on_pre_backward_propagation(self, dA: np.ndarray,
+    def on_pre_backward_propagation(self, dZ: np.ndarray,
                                     layer_index: int,
                                     samples: int,
                                     layer_values: LayerValues,
                                     layer_params: LayerParameters) -> LayerValues:
         """
         Callback to be called before backward propagation.
-        :param dA: The derivative of loss function against dA
+        :param dZ: The derivative of loss function against dZ
         :param layer_index: The index of the current layer
         :param layer_params: The parameters of the current layer
         :return: The altered dA
         """
-        return dA
+        return dZ
 
     def on_post_backward_propagation(self, grads: LayerGrads, layer_index: int,
                                      samples: int,
@@ -111,7 +111,7 @@ class DropoutRegularization(RegularizationBase):
         layer_values.extras['dropout'] = dropout_mask
         return LayerValues(Z=layer_values.Z, A=A, extras=layer_values.extras)
 
-    def on_pre_backward_propagation(self, dA: np.ndarray,
+    def on_pre_backward_propagation(self, dZ: np.ndarray,
                                     layer_index: int,
                                     samples: int,
                                     layer_values: LayerValues,
@@ -119,10 +119,10 @@ class DropoutRegularization(RegularizationBase):
         keep_proba = self.keep_proba(layer_index=layer_index)
         if keep_proba == 1:
             # Disabled drop-out for this layer
-            return dA
+            return dZ
         dropout_mask = layer_values.extras['dropout']
-        dA = dA * dropout_mask
-        return dA
+        dZ = dZ * dropout_mask
+        return dZ
 
     def __repr__(self):
         return f"{self.__class__.__name__}(keep_probs={self._keep_probs})"

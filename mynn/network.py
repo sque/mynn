@@ -5,10 +5,10 @@ from contextlib import contextmanager
 import numpy as np
 
 from .optimizers import OptimizerBase, Adam
-from .activation import BaseActivation
+from .activation import BaseActivation, SoftmaxActivation, SigmoidActivation
 from .initializers import WeightInitializerBase, VarianceScalingWeightInitializer
 from .endecoders import LabelEncoderDecoder
-from .loss import BaseLossFunction, CrossEntropyLoss
+from .loss import BaseLossFunction, CrossEntropyLoss, BinaryCrossEntropyLoss
 from . import _utils
 from .value_types import LayerParameters, LayerValues, LayerGrads
 from .regularization import RegularizationBase
@@ -58,7 +58,7 @@ class FNN:
         self._output_encoder_decoder = output_encoder_decoder
         self._optimizer: OptimizerBase = optimizer or Adam(learning_rate=0.001)
         self._initializer: WeightInitializerBase = initializer or VarianceScalingWeightInitializer(scale=2)
-        self._loss_function: BaseLossFunction = loss_function or CrossEntropyLoss()
+        self._loss_function: BaseLossFunction = loss_function or BinaryCrossEntropyLoss()
         self._regularization = regularization
         self._enabled_regularization: bool = False
 
@@ -89,6 +89,20 @@ class FNN:
             logger.debug(f"  Encoder/Decoder: {self._output_encoder_decoder}")
 
     def _initialize_network(self):
+
+        # Check that we are using Sigmoid-CrossEntropy and Softmax-CrossEntropy
+        # Ugly hack to override the need to analytically calculate the dA using the costly
+        # cubic derivative of Sigmoid.
+        # Can be fixed by first calculating the operations to be performed at each layer
+        # on forward and backward propagation
+        valid_schemas = [
+            isinstance(self._loss_function, BinaryCrossEntropyLoss)
+            and isinstance(self._layers_activation_func[-1], SigmoidActivation),
+            isinstance(self._loss_function, CrossEntropyLoss)
+            and isinstance(self._layers_activation_func[-1], SoftmaxActivation),
+        ]
+        if not any(valid_schemas):
+            raise TypeError("You need to use a compatible output layer with loss function.")
 
         # Initialize layer parameters
         self._layers_parameters = [LayerParameters(None, None)]
@@ -187,19 +201,21 @@ class FNN:
         ):
             if dA_l_right is None:
                 # First iteration, take dA from loss function
-                dA_l_right = self._loss_function.derivative(A=l_values.A, Y=Y)
+                dZ = l_values.A - Y
+            else:
+                dZ = dA_l_right * l_activation_func.derivative(l_values.Z)
 
             # Regularization hook
             if self._regularization and self._enabled_regularization:
-                dA_l_right = self._regularization.on_pre_backward_propagation(
-                    dA=dA_l_right,
+                dZ = self._regularization.on_pre_backward_propagation(
+                    dZ=dZ,
                     layer_index=l_index,
                     samples=m,
                     layer_values=l_values,
                     layer_params=l_params)
 
             # Calculate dZ, dW, db for this layer and store them
-            dZ = dA_l_right * l_activation_func.derivative(l_values.Z)
+            # dZ = dA_l_right * l_activation_func.derivative(l_values.Z)
             dW = np.dot(dZ, l_left_values.A.T) / m
             db = np.mean(dZ, axis=1, keepdims=True)
 
