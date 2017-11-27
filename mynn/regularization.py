@@ -116,7 +116,6 @@ class DropoutRegularization(RegularizationBase):
                                     samples: int,
                                     layer_values: LayerValues,
                                     layer_params: LayerParameters) -> LayerValues:
-        # print(f"Called backwards {layer_index}")
         keep_proba = self.keep_proba(layer_index=layer_index)
         if keep_proba == 1:
             # Disabled drop-out for this layer
