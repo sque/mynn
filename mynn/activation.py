@@ -1,6 +1,6 @@
 import numpy as np
 
-from ._const import FloatOrArray
+from ._const import FloatOrArray, SMALL_FLOAT
 
 
 class BaseActivation:
@@ -52,7 +52,8 @@ class SoftmaxActivation(BaseActivation):
     """
 
     def __call__(self, Z: FloatOrArray) -> FloatOrArray:
-        t = np.exp(Z - np.max(Z))  # Normalize with a constant
+
+        t = np.exp(Z - np.max(Z, axis=0))   # Normalize with a constant
         return t / np.sum(t, axis=0, keepdims=True)
 
     def derivative(self, Z: FloatOrArray) -> FloatOrArray:
