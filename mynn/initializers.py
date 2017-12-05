@@ -71,3 +71,6 @@ class VarianceScalingWeightInitializer(WeightInitializerBase):
         W = np.random.randn(n, n_left) * np.sqrt(self._scale / n_left)
         b = np.zeros((n, 1))
         return W, b
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self._scale})"

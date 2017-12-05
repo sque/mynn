@@ -84,6 +84,7 @@ class FNN:
         logger.debug(f"  Layers sizes: {self._layers_size[1:]}")
         logger.debug(f"  Activation functions: {self._layers_activation_func[1:]}")
         logger.debug(f"  Optimizer: {self._optimizer}")
+        logger.debug(f"  Weight Initializer: {self._initializer}")
         logger.debug(f"  Regularization: {self._regularization}")
         if self._output_encoder_decoder:
             logger.debug(f"  Encoder/Decoder: {self._output_encoder_decoder}")
@@ -92,7 +93,7 @@ class FNN:
 
         # Check that we are using Sigmoid-CrossEntropy and Softmax-CrossEntropy
         # Ugly hack to override the need to analytically calculate the dA using the costly
-        # cubic derivative of Sigmoid.
+        # cubic derivative of Softmax.
         # Can be fixed by first calculating the operations to be performed at each layer
         # on forward and backward propagation
         valid_schemas = [
@@ -251,7 +252,8 @@ class FNN:
               Y: np.ndarray,
               epochs: int = 100,
               mini_batch_size: Optional[int] = None,
-              iteration_callback: Callable[['FNN', 'int', 'int', 'int'], float] = None) -> np.ndarray:
+              iteration_callback: Callable[['FNN', 'int', 'int', 'int'], float] = None,
+              log_every_nth:int=100) -> np.ndarray:
         """
         Train neural network on a given dataset. Training will be performed in batch mode,
         processing the whole dataset in one vectorized command per iteration.
@@ -264,6 +266,7 @@ class FNN:
         :param iteration_callback: A function to be called per iteration with the following arguments:
         (neural_network, epoch, mini_batch, iteration). The output of the function will be attached to the returned
         costs.
+        :param log_every_nth: Every nth iteration will log the current cost
         :return: The final cost per iteration
         """
 
@@ -334,7 +337,7 @@ class FNN:
                     costs.append((cost, extra_cost))
                 else:
                     costs.append(cost)
-                if self._verbose_logging or (iteration % 100 == 0):
+                if self._verbose_logging or (iteration % log_every_nth == 0):
                     logger.debug(f"Epoch: {epoch}, Batch: {batch_index}, Cost: {cost}")
 
         logger.debug(f"Finished training after {epoch + 1} epochs with final cost: {cost}")
