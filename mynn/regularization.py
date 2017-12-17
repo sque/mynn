@@ -64,7 +64,7 @@ class L2Regularization(RegularizationBase):
                                      samples: int,
                                      layer_values: LayerValues,
                                      layer_params: LayerParameters) -> LayerGrads:
-        l2_regularization_term = self._lambd * layer_params.W / (2 * samples)
+        l2_regularization_term = self._lambd * layer_params.W
         return LayerGrads(dW=grads.dW + l2_regularization_term, db=grads.db)
 
     def __repr__(self):
