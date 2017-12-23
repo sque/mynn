@@ -58,10 +58,11 @@ class OptimizerBase:
         Update the computed loss of the last values
         :param loss:
         """
+        from copy import copy
         self._last_loss = loss
         if loss < self.best_loss:
             self.best_loss = min(self.best_loss, loss)
-            self.best_solution = solution
+            self.best_solution = copy(solution)
 
     def parameters_hash(self) -> str:
         """
@@ -134,7 +135,7 @@ class GradientDescentMomentum(GradientDescent):
             ]
 
         return [
-            (average_grads * self.beta + g * (1.0 - self.beta)) / (1 - self.beta**iteration)
+            (average_grads * self.beta + g * (1.0 - self.beta))
 
             for average_grads, g in zip(self._average_gradients, grads)
         ]
@@ -186,12 +187,12 @@ class RMSProp(GradientDescent):
         """
         if self._squared_average_gradients is None:
             return [
-                np.zeros(g.shape)
+                np.ones(g.shape)
                 for g in grads
             ]
 
         return [
-            (average_grads * self.beta2 + (g**2) * (1.0 - self.beta2)) / (1 - self.beta2**iteration)
+            (average_grads * self.beta2 + (g**2) * (1.0 - self.beta2))
             for average_grads, g in zip(self._squared_average_gradients, grads)
         ]
 
@@ -283,7 +284,7 @@ class AdaptiveGradientDescentMomentum(GradientDescentMomentum):
 
         grads = list(grads)
         values = list(values)
-        new_averages = self._get_updated_averages(grads)
+        new_averages = self._get_updated_averages(grads, iteration)
         if self._average_gradients is None:
             self._average_gradients = new_averages
             self._old_learning_rates = [np.ones(lr.shape) * self.max_learning_rate for lr in values]
