@@ -1,6 +1,7 @@
 import logging as _logging
 from typing import List, Optional, Tuple, ContextManager, Callable
 from contextlib import contextmanager
+from datetime import datetime, timedelta
 
 import numpy as np
 
@@ -269,22 +270,15 @@ class FNN:
         :param log_every_nth: Every nth iteration will log the current cost
         :return: The final cost per iteration
         """
+        timer = _utils.RelativeTime()
 
         logger.debug(f"Training on X: {X.shape}, Y: {Y.shape} for {epochs} epochs.")
 
         if X.shape[1] != Y.shape[1]:
             raise ValueError("X and Y dataset do not contain the same number of samples.")
 
-        total_samples = X.shape[1]
-        if mini_batch_size is None:
-            # Disabling batching is like running in one batch
-            mini_batch_size = total_samples
-        else:
+        if mini_batch_size is not None:
             logger.debug(f"Enabling mini-batch optimization with size={mini_batch_size}")
-            shuffled_indices = np.random.permutation(total_samples)
-            logger.debug(f"Shuffling dataset for improved optimization performance")
-            X = X[:, shuffled_indices]
-            Y = Y[:, shuffled_indices]
 
         if self._output_encoder_decoder:
             # Encode Y variable
@@ -297,11 +291,9 @@ class FNN:
             if self._verbose_logging:
                 logger.debug(f"Starting train iteration: {epoch} ")
 
-            for batch_index, batch_start in enumerate(range(0, total_samples, mini_batch_size)):
+            for batch_index, (X_batch, Y_batch) in \
+                    enumerate(_utils.random_mini_batches(X=X, Y=Y, mini_batch_size=mini_batch_size)):
                 iteration = epoch * mini_batch_size + batch_index
-                batch_end = batch_start + min(batch_start + mini_batch_size, total_samples)
-                X_batch = X[:, batch_start:batch_end]
-                Y_batch = Y[:, batch_start:batch_end]
 
                 with self.training_mode():
                     # Forward and then backwards propagation to generate the gradients
@@ -310,7 +302,7 @@ class FNN:
 
                     # Calculate loss and give a chance to the optimizer to do something smarter
                     cost = self.loss(self._layer_values[-1].A, Y_batch)
-                    # self._optimizer.update_loss(cost, self._layers_parameters)
+                    self._optimizer.update_loss(cost, self._layers_parameters)
 
                     # Parameters and grads are stored in named tuples per layer. Optimizer does not
                     # understand this structure but expects an iterable for values and for grads. In
@@ -338,9 +330,15 @@ class FNN:
                 else:
                     costs.append(cost)
                 if self._verbose_logging or (iteration % log_every_nth == 0):
-                    logger.debug(f"Epoch: {epoch}, Batch: {batch_index}, Cost: {cost}")
+                    # Estimate finish time
+                    if not epoch:
+                        finish_timedelta = "N/A"
+                    else:
+                        finish_timedelta = (timer.passed_timedelta * (epochs / epoch)) - timer.passed_timedelta
+                    logger.debug(f"[{timer.passed_timedelta!s}|ep:{epoch}|mb:{batch_index}] Current cost {cost}. "
+                                 f"Finishing in {finish_timedelta}.")
 
-        logger.debug(f"Finished training after {epoch + 1} epochs with final cost: {cost}")
+        logger.debug(f"Finished training in {timer.passed_timedelta!s} after {epoch + 1} epochs with final cost: {cost}")
 
         return np.array(costs)
 
