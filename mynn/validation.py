@@ -5,6 +5,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 
 from mynn.loss import CrossEntropyLoss
 from mynn.network import FNN
+from mynn._utils import TrainingContext
 
 
 def prediction_performance(y_true: np.ndarray, y_pred: np.ndarray, average: str = 'binary') -> Dict[str, np.ndarray]:
@@ -31,8 +32,9 @@ def prediction_performance(y_true: np.ndarray, y_pred: np.ndarray, average: str 
     }
 
 
-def performance_training_callback(datasets_x: List[np.ndarray], datasets_y: List[np.ndarray], every_nth_iteration=100,
-                                  prediction_kwargs: Optional[Dict[str, Any]]=None):
+def performance_training_callback(datasets_x: List[np.ndarray], datasets_y: List[np.ndarray],
+                                      every_nth_iteration=100,
+                                      prediction_kwargs: Optional[Dict[str, Any]] = None):
     """
     Training callback to generate extra performance metrics against multiple datasets.
     :param datasets_x: A list of input features for each dataset
@@ -47,15 +49,13 @@ def performance_training_callback(datasets_x: List[np.ndarray], datasets_y: List
     if len(datasets_x) != len(datasets_y):
         raise ValueError("Datasets X and Y must be of the same size.")
 
-    def _iteration_callback(nn: FNN, epoch: int, mini_batch: int, iteration: int) -> Tuple[Optional[Dict], ...]:
-        if iteration % every_nth_iteration != 0:
-            return (None, ) * len(datasets_x)
+    def _post_iteration_callback(nn: FNN, ctx: TrainingContext) -> bool:
+        if ctx.current_iteration_index % every_nth_iteration != 0:
+            return False
 
-        stats = tuple(
-            prediction_performance(dataset_y, nn.predict(dataset_x), **prediction_kwargs)
-            for dataset_x, dataset_y in zip(datasets_x, datasets_y)
-        )
+        for dataset_idx, (dataset_x, dataset_y) in enumerate(zip(datasets_x, datasets_y)):
+            stats = prediction_performance(dataset_y, nn.predict(dataset_x), **prediction_kwargs)
+            for stat_name, value in stats.items():
+                ctx.report_cost(f"{stat_name}_{dataset_idx}", value)
 
-        return stats
-
-    return _iteration_callback
+    return _post_iteration_callback

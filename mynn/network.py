@@ -253,8 +253,9 @@ class FNN:
               Y: np.ndarray,
               epochs: int = 100,
               mini_batch_size: Optional[int] = None,
-              iteration_callback: Callable[['FNN', 'int', 'int', 'int'], float] = None,
-              log_every_nth:int=100) -> np.ndarray:
+              post_iteration_callbacks: List[Callable[['FNN', _utils.TrainingContext], bool]] = None,
+              train_ctx: _utils.TrainingContext = None,
+              log_every_nth: int = 25) -> _utils.TrainingContext:
         """
         Train neural network on a given dataset. Training will be performed in batch mode,
         processing the whole dataset in one vectorized command per iteration.
@@ -264,9 +265,10 @@ class FNN:
         :param epochs: The number of epochs to optimize parameters of the network
         :param mini_batch_size: The size of mini-batches to perform optimization. If None, it will perform batch
         optimization
-        :param iteration_callback: A function to be called per iteration with the following arguments:
         (neural_network, epoch, mini_batch, iteration). The output of the function will be attached to the returned
         costs.
+        :param post_iteration_callbacks: A list of callbacks that will be triggered after each
+        iteration. Usually to calculate extra costs or early stop.
         :param log_every_nth: Every nth iteration will log the current cost
         :return: The final cost per iteration
         """
@@ -286,14 +288,14 @@ class FNN:
             Y = self._output_encoder_decoder.encode(Y)
 
         self._optimizer.reset()
-        costs = []
-        for epoch in range(epochs):
+        ctx: _utils.TrainingContext = train_ctx or _utils.TrainingContext()
+
+        for epoch in ctx.iter_epochs(epochs):
             if self._verbose_logging:
                 logger.debug(f"Starting train iteration: {epoch} ")
 
-            for batch_index, (X_batch, Y_batch) in \
-                    enumerate(_utils.random_mini_batches(X=X, Y=Y, mini_batch_size=mini_batch_size)):
-                iteration = epoch * mini_batch_size + batch_index
+            for X_batch, Y_batch in \
+                    ctx.iter_mini_batch(_utils.random_mini_batches(X=X, Y=Y, mini_batch_size=mini_batch_size)):
 
                 with self.training_mode():
                     # Forward and then backwards propagation to generate the gradients
@@ -302,7 +304,6 @@ class FNN:
 
                     # Calculate loss and give a chance to the optimizer to do something smarter
                     cost = self.loss(self._layer_values[-1].A, Y_batch)
-                    self._optimizer.update_loss(cost, self._layers_parameters)
 
                     # Parameters and grads are stored in named tuples per layer. Optimizer does not
                     # understand this structure but expects an iterable for values and for grads. In
@@ -313,9 +314,9 @@ class FNN:
                     new_params_flatten = self._optimizer.step(
                         values=list(_utils.nested_chain_iterable(self._layers_parameters[1:], 1)),
                         grads=list(_utils.nested_chain_iterable(grads, 1)),
-                        epoch=epoch,
-                        mini_batch=batch_index,
-                        iteration=iteration
+                        epoch=ctx.current_epoch,
+                        mini_batch=ctx.current_mini_batch_index,
+                        iteration=ctx.current_iteration_index
                     )
 
                     # Repack and update model parameters
@@ -324,23 +325,32 @@ class FNN:
                             W=parameters[0], b=parameters[1]
                         )
 
-                if iteration_callback:
-                    extra_cost = iteration_callback(self, epoch, batch_index, iteration)
-                    costs.append((cost, extra_cost))
-                else:
-                    costs.append(cost)
-                if self._verbose_logging or (iteration % log_every_nth == 0):
-                    # Estimate finish time
-                    if not epoch:
-                        finish_timedelta = "N/A"
-                    else:
-                        finish_timedelta = (timer.passed_timedelta * (epochs / epoch)) - timer.passed_timedelta
-                    logger.debug(f"[{timer.passed_timedelta!s}|ep:{epoch}|mb:{batch_index}] Current cost {cost}. "
-                                 f"Finishing in {finish_timedelta}.")
+                # Finish iteration
+                ctx.iteration_done(cost)
 
-        logger.debug(f"Finished training in {timer.passed_timedelta!s} after {epoch + 1} epochs with final cost: {cost}")
+                # Call callbacks
+                if post_iteration_callbacks:
+                    should_stop = []
+                    for cb in post_iteration_callbacks:
+                        cb_response = cb(self, ctx)
+                        should_stop.append(cb_response)
 
-        return np.array(costs)
+                    if any(should_stop):
+                        logger.debug("Requested to early stop from post iteration callback")
+                        return ctx
+
+                if ctx.current_iteration_index % log_every_nth == 0:
+                    logger.debug(
+                        f"[{timer.passed_timedelta!s}|ep:{ctx.current_epoch}|mb:{ctx.current_mini_batch_index}] "
+                        f"Current cost {cost}.")
+                    # Log progress and report estimated time
+            logger.debug(f"[{timer.passed_timedelta!s}|ep:{ctx.current_epoch}|mb:{ctx.current_mini_batch_index}] "
+                         f"Current cost {cost}. Finishing in {ctx.estimated_remaining_time}.")
+
+        logger.debug(f"Finished training in {ctx.passed_timedelta!s} after {ctx.current_epoch+ 1}"
+                     f" epochs with final cost: {cost}")
+
+        return ctx
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """
