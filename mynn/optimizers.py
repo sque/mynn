@@ -24,7 +24,7 @@ class OptimizerBase:
         self.params = params
 
     def __getattr__(self, item):
-        if item in self.params:
+        if item != 'params' and item in self.params:
             return self.params[item]
         raise AttributeError()
 
@@ -108,20 +108,21 @@ class GradientDescentMomentum(GradientDescent):
     Implementation of Gradient Descent with momentum
     """
 
-    def __init__(self, learning_rate, beta: Optional[float] = 0.9, **extra_params):
+    def __init__(self, learning_rate, beta: Optional[float] = 0.9, bias_correction: bool = True, **extra_params):
         """
         Initialize gradient descent optimizer
         :param learning_rate: The base learning rate to adapt on gradient values
         :param beta: The beta factor of the exponentially weighted averages
+        :param bias_correction: Apply bias correction on the weighted averages
         """
-        super().__init__(learning_rate=learning_rate, beta=beta, **extra_params)
+        super().__init__(learning_rate=learning_rate, beta=beta, bias_correction=bias_correction, **extra_params)
         self._average_gradients = None
 
     def reset(self) -> None:
         super().reset()
         self._average_gradients = None
 
-    def _get_updated_averages(self, grads: List[np.ndarray], iteration: int) -> List[np.ndarray]:
+    def _calculate_averages(self, grads: List[np.ndarray], iteration: int) -> List[np.ndarray]:
         """
         Get the updated gradients exponentially weighted averages
         :param grads:
@@ -129,16 +130,25 @@ class GradientDescentMomentum(GradientDescent):
         :return:
         """
         if self._average_gradients is None:
-            return [
+            self._average_gradients = [
                 np.zeros(g.shape)
                 for g in grads
             ]
 
-        return [
+        # Calculate weighted exponential averages
+        self._average_gradients = [
             (average_grads * self.beta + g * (1.0 - self.beta))
-
             for average_grads, g in zip(self._average_gradients, grads)
         ]
+
+        # Bias correction
+        if self.bias_correction:
+            return [
+                average_grads / (1 - self.beta ** iteration)
+                for average_grads in self._average_gradients
+                ]
+        else:
+            return self._average_gradients
 
     def step(self, values: Iterator[np.ndarray],
              grads: Iterator[np.ndarray],
@@ -147,17 +157,17 @@ class GradientDescentMomentum(GradientDescent):
              iteration: int) -> List[np.ndarray]:
         grads = list(grads)
         values = list(values)
-        self._average_gradients = self._get_updated_averages(grads, iteration + 1)
+        average_gradients = self._calculate_averages(grads, iteration + 1)
 
         results = [
             v - self.learning_rate * grad
-            for v, grad in zip(values, self._average_gradients)
+            for v, grad in zip(values, average_gradients)
         ]
 
         return results
 
     def __repr__(self):
-        return f"GDMomentum(learning_rate={self.learning_rate},beta={self.beta})"
+        return f"GDMomentum(learning_rate={self.learning_rate},beta={self.beta},bias_correction={self.bias_correction})"
 
 
 class RMSProp(GradientDescent):
@@ -165,20 +175,21 @@ class RMSProp(GradientDescent):
     Implementation of Root-Mean-Squared prop optimization algorithm
     """
 
-    def __init__(self, learning_rate, beta2: Optional[float] = 0.9, **extra_params):
+    def __init__(self, learning_rate, beta2: Optional[float] = 0.9, bias_correction: bool = True, **extra_params):
         """
         Initialize gradient descent optimizer
         :param learning_rate: The base learning rate to adapt on gradient values
         :param beta: The beta2 factor of the rmsprop
+        :param bias_correction: Apply bias correction on the weighted averages
         """
-        super().__init__(learning_rate=learning_rate, beta2=beta2, **extra_params)
+        super().__init__(learning_rate=learning_rate, beta2=beta2, bias_correction=bias_correction, **extra_params)
         self._squared_average_gradients = None
 
     def reset(self) -> None:
         super().reset()
         self._squared_average_gradients = None
 
-    def _get_update_squared_averages(self, grads: List[np.ndarray], iteration: int) -> List[np.ndarray]:
+    def _calculate_squared_averages(self, grads: List[np.ndarray], iteration: int) -> List[np.ndarray]:
         """
         Get the updated exponentially weighted averages of squared gradients
         :param grads:
@@ -186,15 +197,23 @@ class RMSProp(GradientDescent):
         :return:
         """
         if self._squared_average_gradients is None:
-            return [
-                np.ones(g.shape)
+            self._squared_average_gradients = [
+                np.zeros(g.shape)
                 for g in grads
             ]
 
-        return [
+        self._squared_average_gradients =  [
             (average_grads * self.beta2 + (g**2) * (1.0 - self.beta2))
             for average_grads, g in zip(self._squared_average_gradients, grads)
         ]
+
+        if self.bias_correction:
+            return [
+                average_grads / (1 - self.beta2 ** iteration)
+                for average_grads in self._squared_average_gradients
+            ]
+        else:
+            return self._squared_average_gradients
 
     def step(self, values: Iterator[np.ndarray],
              grads: Iterator[np.ndarray],
@@ -203,17 +222,17 @@ class RMSProp(GradientDescent):
              iteration: int) -> List[np.ndarray]:
         grads = list(grads)
         values = list(values)
-        self._squared_average_gradients = self._get_update_squared_averages(grads, iteration + 1)
+        squared_average_grad = self._calculate_squared_averages(grads, iteration + 1)
 
         results = [
             v - self.learning_rate * point_grad/(np.sqrt(squared_average_grad) + SMALL_FLOAT)
-            for v, squared_average_grad, point_grad in zip(values, self._squared_average_gradients, grads)
+            for v, squared_average_grad, point_grad in zip(values, squared_average_grad, grads)
         ]
 
         return results
 
     def __repr__(self):
-        return f"RMSProp(learning_rate={self.learning_rate},beta2={self.beta2})"
+        return f"RMSProp(learning_rate={self.learning_rate},beta2={self.beta2},bias_correction={self.bias_correction})"
 
 
 class Adam(RMSProp, GradientDescentMomentum):
@@ -221,14 +240,17 @@ class Adam(RMSProp, GradientDescentMomentum):
     Implementation of Adam algorithm (RMSProp + Momentum)
     """
 
-    def __init__(self, learning_rate, beta: Optional[float] = 0.9, beta2: Optional[float] = 0.99, **extra_params):
+    def __init__(self, learning_rate, beta: Optional[float] = 0.9, beta2: Optional[float] = 0.99,
+                 bias_correction: bool = True, **extra_params):
         """
         Initialize optimizer
         :param learning_rate: The base learning rate to adapt on gradient values
         :param beta: The beta factor of the exponentially weighted averages
         :param beta2: The beta factor of the root mean squared
+        :param bias_correction: Apply bias correction on the weighted averages
         """
-        super().__init__(learning_rate=learning_rate, beta=beta, beta2=beta2, **extra_params)
+        super().__init__(learning_rate=learning_rate, beta=beta, beta2=beta2, bias_correction=bias_correction,
+                         **extra_params)
 
     def step(self, values: Iterator[np.ndarray],
              grads: Iterator[np.ndarray],
@@ -237,18 +259,18 @@ class Adam(RMSProp, GradientDescentMomentum):
              iteration: int) -> List[np.ndarray]:
         grads = list(grads)
         values = list(values)
-        self._average_gradients = self._get_updated_averages(grads, iteration + 1)
-        self._squared_average_gradients = self._get_update_squared_averages(grads, iteration + 1)
+        average_gradients = self._calculate_averages(grads, iteration + 1)
+        squared_average_gradients = self._calculate_squared_averages(grads, iteration + 1)
 
         results = [
             v - self.learning_rate * grad / (np.sqrt(sgrad) + SMALL_FLOAT)
-            for v, grad, sgrad in zip(values, self._average_gradients, self._squared_average_gradients)
+            for v, grad, sgrad in zip(values, average_gradients, squared_average_gradients)
         ]
 
         return results
 
     def __repr__(self):
-        return f"Adam(learning_rate={self.learning_rate},beta={self.beta},beta2={self.beta2})"
+        return f"Adam(learning_rate={self.learning_rate},beta={self.beta},beta2={self.beta2},bias_correction={self.bias_correction})"
 
 
 class AdaptiveGradientDescentMomentum(GradientDescentMomentum):
