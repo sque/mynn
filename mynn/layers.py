@@ -230,6 +230,11 @@ class FullyConnected(Layer):
         return "FC"
 
     @property
+    def units(self) -> int:
+        """Get the number of units"""
+        return self._units
+
+    @property
     def parameters(self):
         return self._parameters._asdict()
 
@@ -283,3 +288,10 @@ class FullyConnected(Layer):
         dIn = np.dot(self._parameters.W.T, dZ)
 
         return (dIn,), (dW, db)
+
+    def __str__(self):
+        if self._activation:
+            activation = f"╭╯ {self._activation}"
+        else:
+            activation = ""
+        return f"{self.layer_type()}({self.units}) {activation} "
