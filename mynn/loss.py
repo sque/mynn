@@ -1,5 +1,5 @@
 import numpy as np
-
+from .activation import SigmoidActivation, SoftmaxActivation
 from ._const import SMALL_FLOAT, FloatOrArray
 
 
@@ -98,3 +98,55 @@ class CrossEntropyLoss:
         """
         A = self._clip_activations(A)
         return - (np.divide(Y, A) - np.divide(1 - Y, 1 - A))
+
+
+class SigmoidCrossEntropyLoss(BinaryCrossEntropyLoss):
+    """
+    Cross entropy with sigmoid response
+    """
+
+    _activation = SigmoidActivation()
+
+    def __call__(self, A: FloatOrArray, Y: FloatOrArray) -> FloatOrArray:
+        """
+        Given two vectors calculate the loss function
+        :param A: The real outcome of the neural network
+        :param Y: The expected output of the neural network
+        :return: The loss of the network
+        """
+        return super().__call__(self._activation(A), Y)
+
+    def derivative(self, A: FloatOrArray, Y: FloatOrArray) -> FloatOrArray:
+        """
+        Calculate the derivative of the function for the value A
+        :param A: The values to calculate derivatives
+        :return: The derivative of the number or the array in the same
+        shape as A
+        """
+        return self._activation(A) - Y
+
+
+class SoftmaxCrossEntropyLoss(CrossEntropyLoss):
+    """
+    Cross entropy with softmax response
+    """
+
+    _activation = SoftmaxActivation()
+
+    def __call__(self, A: FloatOrArray, Y: FloatOrArray) -> FloatOrArray:
+        """
+        Given two vectors calculate the loss function
+        :param A: The real outcome of the neural network
+        :param Y: The expected output of the neural network
+        :return: The loss of the network
+        """
+        return super().__call__(self.n(A), Y)
+
+    def derivative(self, A: FloatOrArray, Y: FloatOrArray) -> FloatOrArray:
+        """
+        Calculate the derivative of the function for the value A
+        :param A: The values to calculate derivatives
+        :return: The derivative of the number or the array in the same
+        shape as A
+        """
+        return self.n(A) - Y
