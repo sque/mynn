@@ -31,7 +31,9 @@ class BaseActivation:
         """
         Just return the name of the final class
         """
-        return self.__class__.__name__.split('.')[-1]
+        class_name = self.__class__.__name__.split('.')[-1]
+        end = class_name.find("Activation")
+        return class_name[:end]
 
 
 class SigmoidActivation(BaseActivation):
