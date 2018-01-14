@@ -1,5 +1,5 @@
-from .network import FNN
+from .network import NNModel
 
 __all__ = [
-    "FNN"
+    "NNModel"
 ]
