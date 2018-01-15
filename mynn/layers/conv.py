@@ -29,13 +29,13 @@ class Conv2D(Layer):
         self._parameters = self.LayerParametersType(KW=None, Kb=None)
         self._cache = self.ForwardCacheType(In=None, Z=None, Out=None)
         self._stride = stride
-        self._padding_size = (0,0)
+        self._padding_size = (0, 0)
         self._output_shape = None
 
         self._activation: BaseActivation = activation
         if isclass(self._activation):
             # If a class is give, instantiate it.
-            self._activation = self._activation()
+            self._activation: BaseActivation = self._activation()
 
     def _calculate_padding_size(self):
         if self._padding_type == 'valid':
@@ -119,13 +119,12 @@ class Conv2D(Layer):
 
         # Initialize empty array of convolution output
         # Format of H, W, C, M
-        self._cache.Z = np.empty(self.output_shape[:-1] + (In.shape[-1], ))
+        self._cache.Z = np.empty(self.output_shape[:-1] + (In.shape[-1],))
 
         for m in range(In.shape[-1]):
             for f in range(self._filters):
                 for h_out in range(self.output_shape[0]):
                     for w_out in range(self.output_shape[1]):
-
                         # Calculate source coordinates
                         top = h_out * self._stride
                         left = w_out * self._stride
@@ -133,22 +132,51 @@ class Conv2D(Layer):
                         right = left + self._kernel_shape[1]
 
                         # Calculate convoluted pixel
-                        convoluted = np.sum(In[top:bottom, left:right,:,m] * self._parameters.KW[:,:,:,f])
+                        convoluted = np.sum(In[top:bottom, left:right, :, m] * self._parameters.KW[:, :, :, f])
                         convoluted += float(self._parameters.Kb.reshape(-1)[f])
 
                         # Save to the output
                         self._cache.Z[h_out, w_out, f, m] = convoluted
 
         if self._activation:
-           self._cache.Out = self._activation(self._cache.Z)
+            self._cache.Out = self._activation(self._cache.Z)
         else:
             self._cache.Out = self._cache.Z
 
         return self._cache.Out
 
-
     def backward(self, dOut: np.ndarray) -> Tuple[NpArrayTuple, NpArrayTuple]:
-        raise NotImplementedError()
+
+        if self._activation:
+            dZ = dOut * self._activation.derivative(self._cache.Z)
+        else:
+            dZ = dOut
+
+        # Prepare derivative tables
+        dIn = np.zeros(self._cache.In.shape)
+        dKW = np.zeros(self._parameters.KW.shape)
+        dKb = np.zeros(self._parameters.Kb.shape)
+
+        for m in range(dOut.shape[-1]):
+            for h_out in range(self.output_shape[0]):
+                for w_out in range(self.output_shape[1]):
+                    for f_out in range(self._filters):
+                        # Calculate input coordinates
+                        top = h_out * self._stride
+                        left = w_out * self._stride
+                        bottom = top + self._kernel_shape[0]
+                        right = left + self._kernel_shape[1]
+
+                        dIn[top:bottom, left:right, :, m] += \
+                            self._parameters.KW[:, :, :, f_out] * dZ[h_out, w_out, f_out, m]
+                        dKW[:, :, :, f_out] += \
+                            self._cache.In[top:bottom, left:right, :, m] * dZ[h_out, w_out, f_out, m]
+                        dKb[:, :, :, f_out] += dZ[h_out, w_out, f_out, m]
+
+        # Remove padding
+        if any(self._padding_size):
+            dIn = dIn[self._padding_size[0]:-self._padding_size[0], self._padding_size[1]:-self._padding_size[-1], :, :]
+        return (dIn,), (dKW, dKb)
 
     def __str__(self):
         if self._activation:

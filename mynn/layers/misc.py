@@ -37,11 +37,10 @@ class Flatten(Layer):
         raise NotImplementedError()
 
     def forward(self, In: np.ndarray) -> np.ndarray:
-        return In.reshape(self.output_shape[:-1] + (In.shape[-1]))
+        return In.reshape(self.output_shape[:-1] + (In.shape[-1],))
 
     def backward(self, dOut: np.ndarray) -> Tuple[NpArrayTuple, NpArrayTuple]:
-        return dOut.reshape(self.input_shape[:-1] + (dOut.shape[-1]))
+        return (dOut.reshape(self.input_shape[:-1] + (dOut.shape[-1],)), ), tuple()
 
     def __str__(self):
-
         return f"{self.layer_type()}()"

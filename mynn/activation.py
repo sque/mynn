@@ -1,6 +1,6 @@
 import numpy as np
 
-from ._const import FloatOrArray, SMALL_FLOAT
+from ._const import FloatOrArray
 
 
 class BaseActivation:
