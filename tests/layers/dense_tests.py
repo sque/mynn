@@ -1,76 +1,12 @@
 import unittest
 import numpy as np
-from mynn.loss import BinaryCrossEntropyLoss, CrossEntropyLoss
+
 from mynn import activation
-from mynn.layers import ShapeDescription, Input, FullyConnected
-from ._utils import approximated_derivative, approximated_derivative_parameters
+from mynn.layers.input import Input
+from mynn.loss import BinaryCrossEntropyLoss
+from mynn.layers.dense import FullyConnected
 
-
-class ShapeDescriptionTestCase(unittest.TestCase):
-
-    def test_complies_same(self):
-        sd = ShapeDescription((None, 2))
-
-        self.assertTrue((10, 2) in sd)
-        self.assertTrue((1, 2) in sd)
-        self.assertTrue((30, 2) in sd)
-
-    def test_partial_shape_incomplies(self):
-        sd = ShapeDescription((None, 2))
-
-        with self.assertRaises(ValueError):
-            self.assertTrue((None, 2) in sd)
-
-        with self.assertRaises(ValueError):
-            self.assertTrue((None,) in sd)
-
-        with self.assertRaises(ValueError):
-            self.assertTrue((None, None) in sd)
-
-    def test_different_shape(self):
-        sd = ShapeDescription((None, 2))
-
-        self.assertFalse((2,) in sd)
-        self.assertFalse((1, 1, 2) in sd)
-        self.assertFalse(tuple() in sd)
-
-    def test_equality(self):
-        sd = ShapeDescription((None, 2))
-
-        sd2 = ShapeDescription((None, 2))
-
-        sd3 = ShapeDescription((4, 2))
-
-        self.assertEqual(sd, sd2)
-        self.assertEqual(sd, (None, 2))
-        self.assertNotEqual(sd, sd3)
-        self.assertNotEqual(sd2, sd3)
-
-
-class InputTestCase(unittest.TestCase):
-
-    def test_shapes(self):
-        i = Input((None, 10))
-        self.assertEqual((None, 10), i.output_shape)
-        self.assertEqual((None, 10), i.input_shape)
-
-    def test_forward(self):
-        i = Input((None, 10))
-        x = np.random.rand(10, 10)
-        self.assertTrue(
-            np.all(x == i.forward(x))
-        )
-
-    def test_shape_validation(self):
-        i = Input((None, 2))
-
-        with self.assertRaises(TypeError):
-            x = np.random.rand(10, 10)
-            i.forward(x)
-
-        with self.assertRaises(TypeError):
-            x = np.random.rand(2, 10)
-            i.forward(x)
+from tests._utils import approximated_derivative_parameters
 
 
 class FullyConnectedTestCase(unittest.TestCase):
