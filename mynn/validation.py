@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 from mynn.loss import CrossEntropyLoss
-from mynn.network import FNN
+from mynn.network import NNModel
 from mynn._utils import TrainingContext
 
 
@@ -49,7 +49,7 @@ def performance_training_callback(datasets_x: List[np.ndarray], datasets_y: List
     if len(datasets_x) != len(datasets_y):
         raise ValueError("Datasets X and Y must be of the same size.")
 
-    def _post_iteration_callback(nn: FNN, ctx: TrainingContext) -> bool:
+    def _post_iteration_callback(nn: NNModel, ctx: TrainingContext) -> bool:
         if ctx.current_iteration_index % every_nth_iteration != 0:
             return False
 

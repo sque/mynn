@@ -137,6 +137,8 @@ class NNModel:
 
         if starting_layer.input_layers:
             for layer in starting_layer.input_layers:
+                if layer is None:
+                    continue
                 yield from self._layer_backward_order(starting_layer=layer,
                                                       return_reverse_depth=return_reverse_depth,
                                                       current_reverse_depth=current_reverse_depth - 1)
@@ -299,7 +301,7 @@ class NNModel:
 
         logger.debug(f"Training on X: {X.shape}, Y: {Y.shape} for {epochs} epochs.")
 
-        if X.shape[1] != Y.shape[1]:
+        if X.shape[-1] != Y.shape[-1]:
             raise ValueError("X and Y dataset do not contain the same number of samples.")
 
         if mini_batch_size is not None:

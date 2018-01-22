@@ -140,7 +140,7 @@ class SoftmaxCrossEntropyLoss(CrossEntropyLoss):
         :param Y: The expected output of the neural network
         :return: The loss of the network
         """
-        return super().__call__(self.n(A), Y)
+        return super().__call__(self._activation(A), Y)
 
     def derivative(self, A: FloatOrArray, Y: FloatOrArray) -> FloatOrArray:
         """
@@ -149,4 +149,4 @@ class SoftmaxCrossEntropyLoss(CrossEntropyLoss):
         :return: The derivative of the number or the array in the same
         shape as A
         """
-        return self.n(A) - Y
+        return self._activation(A) - Y

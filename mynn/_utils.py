@@ -84,7 +84,7 @@ def random_mini_batches(X: np.ndarray, Y: np.ndarray, mini_batch_size: Optional[
     :return: The X and Y for each mini-batch
     """
 
-    total_samples = X.shape[1]
+    total_samples = X.shape[-1]
 
     if mini_batch_size is None or total_samples <= mini_batch_size:
         yield X, Y
@@ -98,7 +98,7 @@ def random_mini_batches(X: np.ndarray, Y: np.ndarray, mini_batch_size: Optional[
     # Return each batch by randomly selecting from dataset
     for current_mini_batch_size in batch_sizes:
         shuffled_indices = np.random.permutation(total_samples)[:current_mini_batch_size]
-        yield X[:, shuffled_indices], Y[:, shuffled_indices]
+        yield X[..., shuffled_indices], Y[:, shuffled_indices]
 
 
 class RelativeTime:
