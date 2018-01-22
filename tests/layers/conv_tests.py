@@ -1,12 +1,53 @@
 import unittest
 from mynn.layers.input import Input
 from mynn.layers.conv import Conv2D
+from mynn.loss import SoftmaxCrossEntropyLoss
 from mynn.activation import ReLUActivation
+from tests._utils import approximated_derivative_parameters
 
 import numpy as np
 
 
 class Conv2DTestCase(unittest.TestCase):
+
+    def setUp(self):
+        f1 = np.array([
+            [3, 0, -3],
+            [2, 0, -2],
+            [3, 0, -3]
+        ])
+        f2 = f1.T
+        f3 = f2 + f1
+        f1 = f1.reshape(3, 3, 1, 1)
+        f2 = f2.reshape(3, 3, 1, 1)
+        f3 = f3.reshape(3, 3, 1, 1)
+
+        KW = np.concatenate((f1, f2, f3), axis=3)
+        self.KW = np.concatenate((KW, KW * 2), axis=2)
+        self.Kb = np.zeros((1, 1, 1, 3))
+
+        input_image_C1 = np.array(
+            [
+                [1, 2, 3, 4],
+                [5, 6, 7, 8],
+                [9, 10, 11, 12],
+                [13, 14, 15, 16],
+            ]).reshape(4, 4, 1)
+        input_image_C2 = np.array([
+            [0.5, 0.2, 0.2, 0.2],
+            [0.2, 0.5, 0.2, 0.2],
+            [0.2, 0.2, 0.5, 0.2],
+            [0.2, 0.2, 0.2, 0.5],
+        ]).reshape(4, 4, 1)
+        input_image1 = np.concatenate((input_image_C1, input_image_C2), axis=2).reshape(4, 4, 2, 1)
+        input_image2 = np.sqrt(input_image1)
+        self.input_images = np.concatenate((input_image1, input_image2), axis=3)
+
+        # print(input_image[1:4, 1:4, 0, 0])
+        # print(KW[:, :, 0, 0])
+        # print(input_image[1:4, 1:4, 0, 0] * KW[:, :, 0, 0])
+        # print(np.sum(input_image[1:4, 1:4, 1, 0] * KW[:, :, 1, 0]))
+
 
     def test_parameter_info(self):
         i = Input((13, 14, 3, None))
@@ -97,106 +138,62 @@ class Conv2DTestCase(unittest.TestCase):
         c = Conv2D(3, (3, 3), padding='valid')(i)
         c_padded = Conv2D(3, (3, 3), padding='same')(i)
 
-        f1 = np.array([
-            [3, 0, -3],
-            [2, 0, -2],
-            [3, 0, -3]
-        ])
-        f2 = f1.T
-        f3 = f2 + f1
-        f1 = f1.reshape(3, 3, 1, 1)
-        f2 = f2.reshape(3, 3, 1, 1)
-        f3 = f3.reshape(3, 3, 1, 1)
+        c.parameters = {'KW': self.KW.copy(), 'Kb': self.Kb.copy()}
+        c_padded.parameters = {'KW': self.KW.copy(), 'Kb': self.Kb.copy()}
 
-        KW = np.concatenate((f1, f2, f3), axis=3)
-        KW = np.concatenate((KW, KW * 2), axis=2)
-
-        input_image_C1 = np.array(
-            [
-                [1, 2, 3, 4],
-                [5, 6, 7, 8],
-                [9, 10, 11, 12],
-                [13, 14, 15, 16],
-            ]).reshape(4, 4, 1)
-        input_image_C2 = np.array([
-            [0.5, 0.2, 0.2, 0.2],
-            [0.2, 0.5, 0.2, 0.2],
-            [0.2, 0.2, 0.5, 0.2],
-            [0.2, 0.2, 0.2, 0.5],
-        ]).reshape(4, 4, 1)
-        input_image = np.concatenate((input_image_C1, input_image_C2), axis=2).reshape(4, 4, 2, 1)
-
-        # print(input_image[1:4, 1:4, 0, 0])
-        # print(KW[:, :, 0, 0])
-        # print(input_image[1:4, 1:4, 0, 0] * KW[:, :, 0, 0])
-        # print(np.sum(input_image[1:4, 1:4, 1, 0] * KW[:, :, 1, 0]))
-        c.parameters = {'KW': KW, 'Kb': np.zeros((1, 1, 1, 3))}
-        c_padded.parameters = {'KW': KW.copy(), 'Kb': np.zeros((1, 1, 1, 3))}
-
-        # TEST VALID
-        convoluted = c.forward(input_image)
-        self.assertTupleEqual(convoluted.shape, (2, 2, 3, 1))
+        # test VALID padding
+        convoluted = c.forward(self.input_images)
+        self.assertTupleEqual(convoluted.shape, (2, 2, 3, 2))
 
         # Test some samples on the convoluted picture that works as it should
         self.assertEqual(convoluted[0, 0, 0, 0], -16)
         self.assertEqual(convoluted[0, 1, 0, 0], -14.8)
         self.assertEqual(convoluted[1, 1, 0, 0], -16)
+        self.assertEqual(convoluted[0, 0, 0, 1], -3.9653934609024333)
+        self.assertEqual(convoluted[0, 1, 0, 1], -2.3811331989685072)
+        self.assertEqual(convoluted[1, 1, 0, 1], -2.5154878955059612)
 
-        # TEST PADDED
-        convoluted_padded = c_padded.forward(input_image)
-        self.assertTupleEqual(convoluted_padded.shape, (4, 4, 3, 1))
-        print(convoluted_padded[3, 3, 0, 0])
+        # test SAME padding
+        convoluted_padded = c_padded.forward(self.input_images)
+        self.assertTupleEqual(convoluted_padded.shape, (4, 4, 3, 2))
+        # print(convoluted_padded[3, 3, 0, 0])
         self.assertEqual(convoluted_padded[0, 0, 0, 0], -25.8)
         self.assertEqual(convoluted_padded[3, 3, 0, 0], 66.8)
         self.assertEqual(convoluted_padded[3, 3, 1, 0], 60.8)
         self.assertEqual(convoluted_padded[3, 3, 2, 0], 127.6)
+        self.assertEqual(convoluted_padded[0, 0, 0, 1], -16.208391422214842)
+        self.assertEqual(convoluted_padded[3, 3, 0, 1], 23.727336132600151)
+        self.assertEqual(convoluted_padded[3, 3, 1, 1], 22.909572670460825)
+        self.assertEqual(convoluted_padded[3, 3, 2, 1], 46.636908803060976)
 
-    def test_forward_without_activation(self):
-        i = Input((2, None))
-        fc = FullyConnected(10, activation=None)(i)
-        fc.parameters = {'W': np.ones((10, 2)), 'b': np.ones((10, 1)) * 2}
-
-        x = np.random.rand(2, 5) * -3
-        y_expected = np.dot(np.ones((10, 2)), x) + (np.ones((10, 1)) * 2)
-        y = fc.forward(x)
-
-        self.assertTrue(np.all(y_expected == y))
-
-        # Test cache
-        self.assertTrue(np.all(y_expected == fc._cache.Z))
-
-        self.assertTrue(np.all(x == fc._cache.In))
-        self.assertTrue(np.all(y_expected == fc._cache.Out))
 
     def test_backwards_grad_check_with_loss(self):
-        loss = BinaryCrossEntropyLoss()
-        i = Input((2, None))
-        fc = FullyConnected(1, activation=activation.SigmoidActivation)(i)
+        loss = SoftmaxCrossEntropyLoss()
+        i = Input((4, 4, 2, None))
+        c = Conv2D(3, (3, 3), padding='valid', activation=None)(i)
 
         np.random.seed(1)
-        w = np.random.randn(*(1, 2))
-        b = np.zeros((1, 1)) * 2
-        fc.parameters = {'W': w.copy(), 'b': b.copy()}
+        c.parameters = {'KW': self.KW.copy(), 'Kb': self.Kb.copy()}
 
-        x = np.random.rand(2, 15)
-        y_expected = np.random.rand(1, 15)
-        y = fc.forward(x)
+        x = np.random.rand(4, 4, 2, 2)
+        y_expected = np.random.rand(2, 2, 3, 2)
+        y = c.forward(x)
 
-        (dx,), (dW, db) = fc.backward(loss.derivative(y, y_expected))
+        (dx,), (dW, db) = c.backward(loss.derivative(y, y_expected))
 
-        def execute_network(x, W, b):
-            i = Input((2, None))
-            fc = FullyConnected(1, activation=activation.SigmoidActivation)(i)
+        def execute_network(x, KW, Kb):
+            i = Input((4, 4, 2, None))
+            c = Conv2D(3, (3, 3), padding='valid', activation=None)(i)
 
-            fc.parameters = {'W': W, 'b': b}
-            return loss(fc.forward(x), y_expected)
+            c.parameters = {'KW': KW, 'Kb': Kb}
+            return loss(c.forward(x), y_expected)
 
-        dx_aprox, dW_aprox, db_aprox = approximated_derivative_parameters(execute_network, x, w, b, e=0.1e-5)
+        dx_aprox, dW_aprox, db_aprox = approximated_derivative_parameters(execute_network, x, self.KW, self.Kb, e=0.1e-3)
 
         # print(dx.shape)
         # print(dx)
         # print(dx_aprox)
-        # print(dx/dx_aprox)
+        print(dx/dx_aprox)
 
         # print(dW, dW_aprox)
         # print(dW - dW_aprox)
